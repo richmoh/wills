@@ -1,26 +1,100 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* Brand palette — deep forest green, warm gold, warm paper */
+  --color-forest-950: #06251b;
+  --color-forest-900: #0a3527;
+  --color-forest-800: #0e4433;
+  --color-forest-700: #14573f;
+  --color-forest-600: #1b6e50;
+  --color-forest-500: #248762;
+  --color-forest-400: #48a37f;
+  --color-forest-300: #7cc0a3;
+  --color-forest-200: #b3dbc9;
+  --color-forest-100: #dcefe6;
+  --color-forest-50: #f0f9f4;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-gold-600: #a07f1a;
+  --color-gold-500: #c09a22;
+  --color-gold-400: #d4b04a;
+  --color-gold-300: #e3c979;
+  --color-gold-200: #f0e0ac;
+  --color-gold-100: #f8f0d8;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-paper: #faf8f2;
+  --color-paper-dark: #f2eee2;
+  --color-ink: #17241f;
+
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-inter);
+  --font-arabic: var(--font-amiri);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-gold-300);
+  color: var(--color-forest-950);
+}
+
+/* Subtle eight-point star lattice, used on dark hero sections */
+.pattern-dark {
+  background-image: url("data:image/svg+xml,%3Csvg width='96' height='96' viewBox='0 0 96 96' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.05' stroke-width='1'%3E%3Cpath d='M48 8 L58 38 L88 48 L58 58 L48 88 L38 58 L8 48 L38 38 Z'/%3E%3Cpath d='M48 24 L55 41 L72 48 L55 55 L48 72 L41 55 L24 48 L41 41 Z'/%3E%3Ccircle cx='0' cy='0' r='6'/%3E%3Ccircle cx='96' cy='0' r='6'/%3E%3Ccircle cx='0' cy='96' r='6'/%3E%3Ccircle cx='96' cy='96' r='6'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* The same lattice for light sections */
+.pattern-light {
+  background-image: url("data:image/svg+xml,%3Csvg width='96' height='96' viewBox='0 0 96 96' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%230a3527' stroke-opacity='0.045' stroke-width='1'%3E%3Cpath d='M48 8 L58 38 L88 48 L58 58 L48 88 L38 58 L8 48 L38 38 Z'/%3E%3Cpath d='M48 24 L55 41 L72 48 L55 55 L48 72 L41 55 L24 48 L41 41 Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Reusable UI primitives */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-forest-800 px-6 py-3 text-sm font-semibold text-white transition hover:bg-forest-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-600 disabled:opacity-50;
+}
+.btn-gold {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-gold-500 px-6 py-3 text-sm font-semibold text-forest-950 transition hover:bg-gold-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-600 disabled:opacity-50;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-full border border-forest-800/25 px-6 py-3 text-sm font-semibold text-forest-900 transition hover:border-forest-800/50 hover:bg-forest-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-600 disabled:opacity-50;
+}
+.input {
+  @apply w-full rounded-xl border border-ink/15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-ink/35 focus:border-forest-600 focus:outline-none focus:ring-2 focus:ring-forest-600/20;
+}
+.label {
+  @apply mb-1.5 block text-sm font-medium text-ink/80;
+}
+.card {
+  @apply rounded-2xl border border-ink/8 bg-white p-6 shadow-[0_1px_3px_rgba(23,36,31,0.06)];
+}
+
+/* Print styling for the will document */
+@media print {
+  body {
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .will-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 22mm 20mm;
+  }
+  .will-clause {
+    break-inside: avoid;
+  }
+  .page-break {
+    break-before: page;
+  }
 }
