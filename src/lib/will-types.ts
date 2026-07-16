@@ -72,7 +72,8 @@ export const emptyWillData = (): WillData => ({
   sex: "male",
   maritalStatus: "married",
   spouseName: "",
-  census: emptyCensus("male"),
+  // default census must agree with the default marital status
+  census: { ...emptyCensus("male"), spouseCount: 1 },
   sonNames: [],
   daughterNames: [],
   fatherName: "",

@@ -19,17 +19,19 @@ export function TextField({
 }) {
   return (
     <div>
-      <label className="label">
-        {label}
-        {hint && <span className="ml-1 font-normal text-ink/45">— {hint}</span>}
+      <label className="block">
+        <span className="label">
+          {label}
+          {hint && <span className="ml-1 font-normal text-ink/45">— {hint}</span>}
+        </span>
+        <input
+          type={type}
+          className="input"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+        />
       </label>
-      <input
-        type={type}
-        className="input"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
     </div>
   );
 }
