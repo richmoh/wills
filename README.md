@@ -128,15 +128,26 @@ pnpm test:e2e                # screenshots land in tests/shots/
 ## Deployment
 
 Runs on the VPS at 185.241.151.231: app `wasiyyah` under PM2 on port **3011**,
-source in `/var/www/wasiyyah`, nginx site `wills.themuslimguide.org` with certbot
-TLS, database `wasiyyah` on the box's Postgres 16 (credentials in the server's
-`.env.local`, never in the repo).
+source in `/var/www/wasiyyah`, database `wasiyyah` on the box's Postgres 16
+(credentials in the server's `.env.local`, never in the repo).
+
+Since 2026-11-16 the site is served at **https://wasiyyahwills.com** (nginx site
+`wasiyyahwills.com`, copy in `deploy/nginx-wasiyyahwills.conf`). `www`, plain http and
+`wasiyyawills.com` (no "h") redirect to it, and so does the old address,
+`wills.themuslimguide.org` (`deploy/nginx-wills.conf`). Certificates are from certbot,
+one per domain, and renew on their own.
 
 Redeploy after changes:
 
 ```bash
-./deploy/deploy.sh   # rsync → pnpm install → build → pm2 restart
+npm run deploy:check   # what a deploy would change; changes nothing
+npm run deploy         # check server → rsync → pnpm install and build → migrations → pm2 restart → checks
 ```
+
+`npm run redeploy` is the same as `npm run deploy`. With pnpm, use `pnpm run deploy`:
+`pnpm deploy` is a different, built-in pnpm command. The deploy sends this folder as it
+is, including uncommitted changes, and builds in place, so the site can misbehave
+between the start of the build and the restart.
 
 ## Open questions for review
 

@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e.mjs"
+    "test:e2e": "node tests/e2e.mjs",
+    "deploy": "bash deploy/deploy.sh",
+    "redeploy": "bash deploy/deploy.sh",
+    "deploy:check": "bash deploy/deploy.sh --dry-run"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

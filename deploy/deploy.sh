@@ -1,26 +1,163 @@
 #!/usr/bin/env bash
-# Deploy Wasiyyah to the VPS.
-# Usage: ./deploy/deploy.sh  (run from the repo root on your machine)
+#
+# Deploy Wasiyyah to the VPS, where it is served at https://wasiyyahwills.com.
+#
+#   npm run deploy          # deploy this folder as it is now
+#   npm run deploy:check    # show what a deploy would change; changes nothing
+#
+# The server's /var/www/wasiyyah IS the deployment (there are no release
+# folders to roll back to), so the order is chosen to fail as early as it can:
+# check the server → sync source → install and build → migrations → restart →
+# checks. It stops at the first failure. A build that fails is never restarted
+# into, and migrations only run once the build has succeeded.
 set -euo pipefail
+
+cd "$(dirname "$0")/.."
 
 HOST=root@185.241.151.231
 DIR=/var/www/wasiyyah
+APP=wasiyyah                 # PM2 process name
+PORT=3011
+URL=https://wasiyyahwills.com
+# path:expected-status pairs, checked on the server against 127.0.0.1:$PORT
+# after the restart. /dashboard must redirect (307) when signed out: that shows
+# the sign-in guard ran, not just that something is listening.
+CHECKS="/:200 /pricing:200 /login:200 /dashboard:307"
 
-echo "→ syncing source"
-rsync -az --delete \
-  --exclude node_modules --exclude .next --exclude .git \
-  --exclude .env.local --exclude tests/shots \
-  ./ "$HOST:$DIR/"
+DRY_RUN=no
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=yes ;;
+    -h|--help) sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $arg" >&2; exit 1 ;;
+  esac
+done
 
-echo "→ applying database migrations"
-# Every migration is idempotent (create/alter ... if not exists), so all of them run on
-# each deploy. Only DATABASE_URL is read from the server's .env.local.
-ssh "$HOST" "set -e; cd $DIR; DATABASE_URL=\$(grep -E '^DATABASE_URL=' .env.local | head -1 | cut -d= -f2- | tr -d '\"'); for f in migrations/*.sql; do psql \"\$DATABASE_URL\" -v ON_ERROR_STOP=1 -q -f \"\$f\"; done"
+SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST")
 
-echo "→ building on server"
-ssh "$HOST" "set -e; cd $DIR; corepack enable >/dev/null 2>&1 || true; pnpm install --frozen-lockfile; pnpm build"
+# What is sent is this folder, not a commit, so say what that is.
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  dirty=$(git status --porcelain -uall | wc -l | tr -d ' ')
+  echo "── Deploying this folder: commit $(git rev-parse --short HEAD) plus $dirty uncommitted file(s)"
+fi
 
-echo "→ restarting app"
-ssh "$HOST" "cd $DIR && (pm2 restart wasiyyah --update-env 2>/dev/null || PORT=3011 pm2 start 'pnpm start' --name wasiyyah) && pm2 save"
+# ── Check the server before touching it. Setting NAMES only are examined or
+# printed; values must not reach a terminal or a log.
+echo "── Checking the server"
+"${SSH[@]}" "bash -s -- '$DIR' '$URL'" <<'PREFLIGHT'
+set -euo pipefail
+DIR=$1 URL=$2
+cd "$DIR"
+[ -f .env.local ] || { echo "error: $DIR/.env.local is missing" >&2; exit 1; }
+has() { grep -qE "^$1=.+" .env.local; }
 
-echo "✓ deployed — https://wills.themuslimguide.org"
+missing=""
+for key in DATABASE_URL SESSION_SECRET NEXT_PUBLIC_APP_URL; do
+  has "$key" || missing="$missing $key"
+done
+[ -z "$missing" ] || { echo "error: .env.local has no value for:$missing" >&2; exit 1; }
+
+# NEXT_PUBLIC_APP_URL is baked into the build, so a stale one goes live.
+app_url=$(grep -E '^NEXT_PUBLIC_APP_URL=' .env.local | head -1 | cut -d= -f2- | tr -d '"')
+[ "$app_url" = "$URL" ] || echo "   ! NEXT_PUBLIC_APP_URL is $app_url, not $URL: email links and page metadata will use it"
+{ has RESEND_API_KEY && has EMAIL_FROM; } || echo "   ! RESEND_API_KEY / EMAIL_FROM not set: password-reset emails will not send"
+{ has STRIPE_SECRET_KEY && has STRIPE_WEBHOOK_SECRET; } || echo "   ! Stripe keys not set: payments stay switched off"
+
+# Builds are the memory spike on a server with no swap, and when memory runs
+# out the kernel may kill another app rather than this build.
+avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
+[ "$avail" -ge 1500 ] || echo "   ! only ${avail}MB of memory free and the server has no swap: the build may be killed"
+
+echo "   ✓ server reachable, required settings present"
+PREFLIGHT
+
+# ── rsync. --delete stops removed files piling up on the server, so anything
+# that lives only on the server must be excluded here or it is deleted. The
+# server's .env.local is its own; no env file other than the example is sent.
+RSYNC_ARGS=(-az --delete
+  --exclude .git --exclude node_modules --exclude .next
+  --include .env.example --exclude ".env*"
+  --exclude tests/shots --exclude .DS_Store)
+
+if [ "$DRY_RUN" = yes ]; then
+  echo "── Dry run: what a deploy would change in $HOST:$DIR (nothing is changed)"
+  rsync -n -v "${RSYNC_ARGS[@]}" ./ "$HOST:$DIR/"
+  exit 0
+fi
+
+echo "── Syncing source"
+rsync "${RSYNC_ARGS[@]}" ./ "$HOST:$DIR/"
+
+echo "── Building, migrating, restarting"
+"${SSH[@]}" "bash -s -- '$DIR' '$APP' '$PORT' '$CHECKS'" <<'REMOTE'
+set -euo pipefail
+DIR=$1 APP=$2 PORT=$3 CHECKS=$4
+cd "$DIR"
+
+corepack enable >/dev/null 2>&1 || true
+pnpm install --frozen-lockfile
+pnpm build
+
+# Every migration is idempotent (create/alter ... if not exists), so all of
+# them run on each deploy. Only DATABASE_URL is read from .env.local.
+DATABASE_URL=$(grep -E '^DATABASE_URL=' .env.local | head -1 | cut -d= -f2- | tr -d '"')
+for f in migrations/*.sql; do
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+  echo "   ✓ $f"
+done
+
+if pm2 describe "$APP" >/dev/null 2>&1; then
+  pm2 restart "$APP" >/dev/null
+else
+  PORT="$PORT" pm2 start 'pnpm start' --name "$APP" >/dev/null
+fi
+# Without this the process is forgotten at the next reboot.
+pm2 save >/dev/null
+
+# Give the new process up to 30 seconds to answer before judging it.
+for _ in $(seq 1 30); do
+  curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$PORT/" && break
+  sleep 1
+done
+
+fails=0
+for spec in $CHECKS; do
+  path="${spec%:*}"; want="${spec##*:}"
+  got=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "http://127.0.0.1:$PORT$path" || true)
+  if [ "$got" = "$want" ]; then
+    echo "   ✓ $path ($got)"
+  else
+    echo "   ✗ $path: expected $want, got $got"
+    fails=$((fails + 1))
+  fi
+done
+
+# "online" in PM2 proves nothing: the old build stays up through a failed
+# restart. Every page the new build serves carries its build id.
+BUILD_ID=$(cat .next/BUILD_ID)
+if curl -s --max-time 15 "http://127.0.0.1:$PORT/" | grep -q "$BUILD_ID"; then
+  echo "   ✓ the app is serving the new build ($BUILD_ID)"
+else
+  echo "   ✗ the app is not serving the build that was just made ($BUILD_ID)"
+  fails=$((fails + 1))
+fi
+
+if [ "$fails" != 0 ]; then
+  echo "── Checks FAILED. Last error lines from the app:"
+  pm2 logs "$APP" --err --lines 30 --nostream || true
+  echo "   There is no earlier release to roll back to: fix it and deploy again."
+  exit 1
+fi
+REMOTE
+
+# ── The same check from outside, through nginx and TLS.
+echo "── Checking $URL"
+BUILD_ID=$("${SSH[@]}" "cat '$DIR/.next/BUILD_ID'")
+if curl -s --max-time 20 "$URL/" | grep -q "$BUILD_ID"; then
+  echo "   ✓ $URL is serving the new build ($BUILD_ID)"
+else
+  echo "   ✗ $URL is not serving build $BUILD_ID. The app itself passed its checks, so look at nginx or DNS." >&2
+  exit 1
+fi
+
+echo "── Deployed ✓  $URL"
