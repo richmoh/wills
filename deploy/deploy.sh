@@ -7,9 +7,11 @@
 #
 # The server's /var/www/wasiyyah IS the deployment (there are no release
 # folders to roll back to), so the order is chosen to fail as early as it can:
-# check the server → sync source → install and build → migrations → restart →
-# checks. It stops at the first failure. A build that fails is never restarted
-# into, and migrations only run once the build has succeeded.
+# check the server → sync source → migrations → install and build → restart →
+# checks. It stops at the first failure. Migrations run before the build
+# because they only ever add things, so the running app is unaffected by them,
+# whereas a build replaces the files the running app is serving: nothing may
+# fail between the build and the restart.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -88,23 +90,42 @@ fi
 echo "── Syncing source"
 rsync "${RSYNC_ARGS[@]}" ./ "$HOST:$DIR/"
 
-echo "── Building, migrating, restarting"
+echo "── Migrating, building, restarting"
 "${SSH[@]}" "bash -s -- '$DIR' '$APP' '$PORT' '$CHECKS'" <<'REMOTE'
 set -euo pipefail
 DIR=$1 APP=$2 PORT=$3 CHECKS=$4
 cd "$DIR"
 
+# ── Migrations. The tables belong to the postgres superuser, and the app's own
+# role may read and write them but not change them, so migrations run as
+# postgres and the app's role is then granted the use of whatever they made.
+# Every migration is idempotent (create/alter ... if not exists), so all of
+# them run on each deploy. Only the database and role NAMES are taken from
+# DATABASE_URL.
+DATABASE_URL=$(grep -E '^DATABASE_URL=' .env.local | head -1 | cut -d= -f2- | tr -d '"')
+DB_NAME=$(printf '%s' "$DATABASE_URL" | sed -E 's|^[a-z]+://[^/]+/([^?]+).*|\1|')
+DB_USER=$(printf '%s' "$DATABASE_URL" | sed -E 's|^[a-z]+://([^:@/]+).*|\1|')
+
+# This database has no other backup, so keep a copy from before each deploy.
+mkdir -p /root/backups/wasiyyah
+sudo -u postgres pg_dump -Fc "$DB_NAME" > "/root/backups/wasiyyah/db-$(date +%Y%m%d%H%M%S).dump"
+ls -1t /root/backups/wasiyyah/db-*.dump | tail -n +11 | xargs -r rm --
+echo "   ✓ database copied to /root/backups/wasiyyah (last 10 kept)"
+
+for f in migrations/*.sql; do
+  sudo -u postgres PGOPTIONS='-c client_min_messages=warning' \
+    psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -q < "$f"
+  echo "   ✓ $f"
+done
+sudo -u postgres psql -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -c \
+  "grant all privileges on all tables in schema public to \"$DB_USER\"; grant all privileges on all sequences in schema public to \"$DB_USER\";"
+# the app's own role must be able to reach what the code expects
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc "select 1 from users limit 1; select 1 from password_resets limit 1;" >/dev/null
+echo "   ✓ the app can use the database"
+
 corepack enable >/dev/null 2>&1 || true
 pnpm install --frozen-lockfile
 pnpm build
-
-# Every migration is idempotent (create/alter ... if not exists), so all of
-# them run on each deploy. Only DATABASE_URL is read from .env.local.
-DATABASE_URL=$(grep -E '^DATABASE_URL=' .env.local | head -1 | cut -d= -f2- | tr -d '"')
-for f in migrations/*.sql; do
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"
-  echo "   ✓ $f"
-done
 
 if pm2 describe "$APP" >/dev/null 2>&1; then
   pm2 restart "$APP" >/dev/null
