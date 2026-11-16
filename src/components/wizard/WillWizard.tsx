@@ -247,6 +247,16 @@ export function WillWizard({
   const group = GROUPS.find((g) => g.id === NAV[step.id].group)!;
   const nextStep = steps[stepIndex + 1];
   const sharesOnPhone = SHARES_ON_PHONE.includes(step.id) && !!result && !result.noHeirs;
+  // A new will starts as "married", so the engine would show a wife taking
+  // everything before the person has said a word. The picture waits until
+  // they have been past the marriage step, or have told us of any relative.
+  const fam = data.census;
+  const sharesStarted =
+    furthest > steps.findIndex((s) => s.id === "marriage") ||
+    fam.sons + fam.daughters + fam.grandsons + fam.granddaughters > 0 ||
+    fam.fullBrothers + fam.fullSisters + fam.paternalBrothers + fam.paternalSisters + fam.maternalSiblings > 0 ||
+    fam.father || fam.mother || fam.paternalGrandfather || fam.paternalGrandmother || fam.maternalGrandmother ||
+    fam.hasOtherAgnates || fam.hasDistantKindred;
 
   const saveStatus = (
     <span
@@ -452,7 +462,7 @@ export function WillWizard({
           className="hidden min-w-0 flex-[1_1_340px] md:block xl:sticky xl:top-6 xl:max-h-[calc(100vh-48px)] xl:overflow-y-auto"
         >
           <SharesPanel
-            result={result}
+            result={sharesStarted ? result : null}
             data={data}
             familyAnswered={NAV[step.id].group !== "family"}
           />

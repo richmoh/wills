@@ -133,7 +133,7 @@ export function WillSheet({
             {[1, 2].map((n) => (
               <div key={n} className="mt-9">
                 <div className="text-[13px] font-semibold tracking-[0.06em] uppercase">
-                  Witness {n} — must not be a beneficiary or a beneficiary&rsquo;s spouse
+                  Witness {n}{" "}— must not be a beneficiary or a beneficiary&rsquo;s spouse
                 </div>
                 <div className="mt-11 grid grid-cols-2 gap-x-8 gap-y-11">
                   <SignLine>Signature</SignLine>
