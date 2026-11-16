@@ -114,8 +114,8 @@ export default function FaqPage() {
           />
           <p className="mt-9 text-[16px] text-ink-soft">
             Something else?{" "}
-            <a href="mailto:support@themuslimguide.org" className="font-semibold">
-              support@themuslimguide.org
+            <a href="mailto:hello@wasiyyahwills.com" className="font-semibold">
+              hello@wasiyyahwills.com
             </a>
           </p>
         </div>

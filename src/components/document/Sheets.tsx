@@ -149,7 +149,7 @@ export function WillSheet({
 
       <footer className="will-footer mt-12 border-t border-doc-line pt-3.5 text-center text-[13px] text-doc-soft">
         Prepared with Wasiyyah ({isPremium ? "Complete Will Pack" : "free plan"}) on {generatedOn} ·
-        reference {doc.reference}{" "}· wills.themuslimguide.org · This
+        reference {doc.reference}{" "}· wasiyyahwills.com · This
         document was prepared from the testator&rsquo;s own instructions. The
         testator and both witnesses should initial the foot of every page.
       </footer>

@@ -4,34 +4,33 @@ Wasiyyah is a web application that produces a last will and testament in the Qur
 (fara'id) shares, drafted for the law of England & Wales, from a short guided interview
 (typically 12–18 questions).
 
-**Live:** https://wills.themuslimguide.org
+**Live:** https://wasiyyahwills.com
 
 ## Status
 
-- ✅ Live in production (VPS, PM2 + nginx + Let's Encrypt)
+- ✅ Live in production at wasiyyahwills.com (VPS, PM2 + nginx + Let's Encrypt), with a
+  nightly database backup on the server (see Deployment → Backups)
 - ✅ Unit suite green: 60 tests — engine golden cases and invariants, plus the interview's
   pruning rules checked against the engine for 20,000 random families
 - ✅ Browser end-to-end suite green locally (50 checks: interview, shares, document, paid
   pack, mirror will, password reset, data export, account deletion)
-- ⚠️ **Changes since the last deploy need three things on the server before deploying:**
-  `migrations/002_account_security.sql` applied (the deploy script now applies all
-  migrations, untested against the server), `NEXT_PUBLIC_APP_URL` set, and — for password
-  reset emails — `RESEND_API_KEY` + `EMAIL_FROM`. Without the email keys the forgot-password
-  page tells people to email support.
+- ⏳ **Email is not switched on yet.** Password-reset emails need `RESEND_API_KEY` and
+  `EMAIL_FROM` in the server's `.env.local` (sender domain verified in Resend); until then
+  the forgot-password page tells people to email us. The contact address shown on the
+  site, the will and the reset email is `hello@wasiyyahwills.com`, which needs a mailbox
+  behind it: `npm run deploy:check` warns while the domain has no mail (MX) record.
 - ⏳ Not yet reviewed by a solicitor (will wording, terms) or a scholar (fiqh). The site
   now says so; the open questions for each are listed in "Open questions for review" below.
-- ⏳ **Stripe keys not yet configured on the server** — checkout returns a friendly
-  503 until `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` are added to
-  `/var/www/wasiyyah/.env.local` and the app restarted (`pm2 restart wasiyyah`).
-  Create the webhook in the Stripe dashboard → endpoint
-  `https://wills.themuslimguide.org/api/stripe/webhook`, event
-  `checkout.session.completed`.
+- ✅ **Payments are switched on** (2026-11-16) through Wasiyyah's own Stripe account. The
+  server's `.env.local` holds a restricted key (one permission, Checkout Sessions: write)
+  as `STRIPE_SECRET_KEY` and the webhook's signing secret as `STRIPE_WEBHOOK_SECRET`; the
+  webhook sends `checkout.session.completed` to
+  `https://wasiyyahwills.com/api/stripe/webhook`. Checkout offers card, Apple Pay and Link.
+  If the code ever makes another kind of Stripe call, the key needs that permission added.
 - ⏳ Recommended before heavy marketing: one-time solicitor review of the templates
   and scholar review of the fiqh (the engine's rule trace exists to make this easy)
-- 🔎 Dedicated-domain options researched in [DOMAINS.md](DOMAINS.md)
-  (short version: `wasiyyah.com/.co.uk` are taken but dormant; `wasiyyah.app`,
-  `wasiyyahwills.com`, `mywasiyyah.co.uk`, `muslimwill.co.uk`, and the
-  `deenwills.com + .co.uk` pair are available)
+- 🔎 The domain is `wasiyyahwills.com` (2026-11-16); the research behind the choice is in
+  [DOMAINS.md](DOMAINS.md)
 
 ## How it works
 
@@ -121,9 +120,9 @@ pnpm test:e2e                # screenshots land in tests/shots/
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 | `STRIPE_PRICE_ID` | optional pre-created Price (ad-hoc GBP price used if unset) |
 | `PREMIUM_PRICE_PENCE` | pack price in pence (default 3900) |
-| `NEXT_PUBLIC_APP_URL` | canonical URL, e.g. `https://wills.themuslimguide.org` |
+| `NEXT_PUBLIC_APP_URL` | canonical URL, e.g. `https://wasiyyahwills.com` |
 | `RESEND_API_KEY` | Resend API key for password-reset emails (optional in dev — the email is printed to the server console) |
-| `EMAIL_FROM` | sender address on a domain verified in Resend, e.g. `Wasiyyah <no-reply@example.org>` |
+| `EMAIL_FROM` | sender address on a domain verified in Resend, e.g. `Wasiyyah <hello@wasiyyahwills.com>` |
 
 ## Deployment
 

@@ -15,7 +15,7 @@ const intro = (
     you can do about it. Wasiyyah (&ldquo;we&rdquo;) decides how that
     information is used, which makes us the data controller under UK
     data protection law. You can reach us about anything here at
-    support@themuslimguide.org.
+    hello@wasiyyahwills.com.
   </p>
 );
 
@@ -268,7 +268,7 @@ const sections: LegalSection[] = [
           restricted, to object to its use, to receive it in a portable
           format, and to withdraw your consent at any time. Withdrawing
           consent does not affect anything done before you withdrew it. To
-          use any of these rights, email support@themuslimguide.org. We
+          use any of these rights, email hello@wasiyyahwills.com. We
           must reply within one month.
         </p>
         <p>
@@ -296,7 +296,7 @@ const sections: LegalSection[] = [
   },
 ];
 
-const closing = <p>Contact: support@themuslimguide.org</p>;
+const closing = <p>Contact: hello@wasiyyahwills.com</p>;
 
 export default function PrivacyPage() {
   return (

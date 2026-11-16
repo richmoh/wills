@@ -81,6 +81,13 @@ avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
 echo "   ✓ server reachable, required settings present"
 PREFLIGHT
 
+# The contact address is on the site's pages, the will and the reset email. If
+# its domain cannot receive mail, everyone who writes to it gets a bounce.
+CONTACT=hello@wasiyyahwills.com
+if command -v dig >/dev/null 2>&1 && [ -z "$(dig +short MX "${CONTACT#*@}" 2>/dev/null)" ]; then
+  echo "   ! ${CONTACT#*@} has no mail (MX) record: email sent to $CONTACT bounces"
+fi
+
 # ── rsync. --delete stops removed files piling up on the server, so anything
 # that lives only on the server must be excluded here or it is deleted. The
 # server's .env.local is its own; no env file other than the example is sent.

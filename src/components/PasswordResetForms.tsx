@@ -59,7 +59,7 @@ export function ForgotPasswordForm() {
         </AuthHeading>
         <p className="text-ink-soft">
           Nothing arrived? Check your spam folder, or email
-          support@themuslimguide.org.
+          hello@wasiyyahwills.com.
         </p>
         {devResetUrl && (
           <p className="note-warn text-[16px]">

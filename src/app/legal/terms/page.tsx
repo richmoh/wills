@@ -79,7 +79,7 @@ export default function TermsPage() {
       <LegalDocument
         title="Terms of service"
         sections={sections}
-        closing={<p>Contact: support@themuslimguide.org</p>}
+        closing={<p>Contact: hello@wasiyyahwills.com</p>}
       />
       <SiteFooter />
     </>

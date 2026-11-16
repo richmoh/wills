@@ -15,7 +15,7 @@ ${url}
 The link works once and expires in one hour. If you did not ask for this, you can ignore this email — your password has not been changed.
 
 Wasiyyah
-support@themuslimguide.org
+hello@wasiyyahwills.com
 `;
 
 export async function POST(req: NextRequest) {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return Response.json(
       {
         error:
-          "We cannot send password reset emails at the moment — please email support@themuslimguide.org and we will help you back into your account.",
+          "We cannot send password reset emails at the moment — please email hello@wasiyyahwills.com and we will help you back into your account.",
       },
       { status: 503 }
     );
