@@ -62,7 +62,7 @@ done
 # NEXT_PUBLIC_APP_URL is baked into the build, so a stale one goes live.
 app_url=$(grep -E '^NEXT_PUBLIC_APP_URL=' .env.local | head -1 | cut -d= -f2- | tr -d '"')
 [ "$app_url" = "$URL" ] || echo "   ! NEXT_PUBLIC_APP_URL is $app_url, not $URL: email links and page metadata will use it"
-{ has RESEND_API_KEY && has EMAIL_FROM; } || echo "   ! RESEND_API_KEY / EMAIL_FROM not set: password-reset emails will not send"
+{ has POSTAL_API_KEY && has EMAIL_FROM; } || echo "   ! POSTAL_API_KEY / EMAIL_FROM not set: password-reset emails will not send"
 { has STRIPE_SECRET_KEY && has STRIPE_WEBHOOK_SECRET; } || echo "   ! Stripe keys not set: payments stay switched off"
 
 # The nightly database copy fails silently if nobody looks, so look here.

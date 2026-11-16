@@ -10,15 +10,14 @@ Wasiyyah is a web application that produces a last will and testament in the Qur
 
 - ✅ Live in production at wasiyyahwills.com (VPS, PM2 + nginx + Let's Encrypt), with a
   nightly database backup on the server (see Deployment → Backups)
-- ✅ Unit suite green: 60 tests — engine golden cases and invariants, plus the interview's
-  pruning rules checked against the engine for 20,000 random families
+- ✅ Unit suite green: 66 tests — engine golden cases and invariants, the interview's
+  pruning rules checked against the engine for 20,000 random families, and the email sender
 - ✅ Browser end-to-end suite green locally (50 checks: interview, shares, document, paid
   pack, mirror will, password reset, data export, account deletion)
-- ⏳ **Email is not switched on yet.** Password-reset emails need `RESEND_API_KEY` and
-  `EMAIL_FROM` in the server's `.env.local` (sender domain verified in Resend); until then
-  the forgot-password page tells people to email us. The contact address shown on the
-  site, the will and the reset email is `hello@wasiyyahwills.com`, which needs a mailbox
-  behind it: `npm run deploy:check` warns while the domain has no mail (MX) record.
+- ✅ **Email is switched on** (2026-11-16). Password-reset emails go through our own Postal
+  mail server and Amazon SES (see Deployment → Email); a reset email sent from the live
+  site was accepted by both. The contact address on the site, the will and the reset
+  email is `hello@wasiyyahwills.com`.
 - ⏳ Not yet reviewed by a solicitor (will wording, terms) or a scholar (fiqh). The site
   now says so; the open questions for each are listed in "Open questions for review" below.
 - ✅ **Payments are switched on** (2026-11-16) through Wasiyyah's own Stripe account. The
@@ -121,8 +120,10 @@ pnpm test:e2e                # screenshots land in tests/shots/
 | `STRIPE_PRICE_ID` | optional pre-created Price (ad-hoc GBP price used if unset) |
 | `PREMIUM_PRICE_PENCE` | pack price in pence (default 3900) |
 | `NEXT_PUBLIC_APP_URL` | canonical URL, e.g. `https://wasiyyahwills.com` |
-| `RESEND_API_KEY` | Resend API key for password-reset emails (optional in dev — the email is printed to the server console) |
-| `EMAIL_FROM` | sender address on a domain verified in Resend, e.g. `Wasiyyah <hello@wasiyyahwills.com>` |
+| `POSTAL_API_KEY` | Wasiyyah's key for our Postal mail server, for password-reset emails (optional in dev — the email is printed to the server console) |
+| `EMAIL_FROM` | sender on Wasiyyah's verified sending domain: `Wasiyyah <hello@mail.wasiyyahwills.com>` |
+| `EMAIL_REPLY_TO` | optional; where replies go, since nothing receives mail at the sending domain (default `hello@wasiyyahwills.com`) |
+| `POSTAL_URL` | optional; the Postal server (default `https://email.oneabsolute.co.uk`) |
 
 ## Deployment
 
@@ -147,6 +148,34 @@ npm run deploy         # check server → rsync → database copy and migrations
 `pnpm deploy` is a different, built-in pnpm command. The deploy sends this folder as it
 is, including uncommitted changes, and builds in place, so the site can misbehave
 between the start of the build and the restart.
+
+### Email
+
+Sending follows the same pattern as our other products: the app posts each message to
+our Postal server (`https://email.oneabsolute.co.uk`, `src/lib/email.ts`), and Postal hands
+it to Amazon SES (eu-west-2) for delivery. Wasiyyah has its own SES identity
+(`mail.wasiyyahwills.com`, configuration set `wasiyyah`), its own Postal server and its own
+key, so it shares no sending reputation with the other products. Mail goes out as
+`Wasiyyah <hello@mail.wasiyyahwills.com>`; nothing receives mail at that subdomain, so
+every message carries Reply-To `hello@wasiyyahwills.com`.
+
+`hello@wasiyyahwills.com` is a real inbox: the domain is a Google Workspace user alias
+domain of `oneabsolute.co.uk`, so it delivers to `hello@oneabsolute.co.uk` (and every other
+oneabsolute.co.uk address has a twin at wasiyyahwills.com).
+
+DNS for all of this is at 123 Reg. On the bare domain: Google's `MX 1 smtp.google.com`,
+its verification TXT and `v=spf1 include:_spf.google.com ~all`. Under `mail.`: three SES
+signing CNAMEs (`<token>._domainkey.mail`), the bounce pair (`bounce.mail` MX and SPF TXT),
+Postal's SPF TXT (`mail`) and signing key (`postal-<id>._domainkey.mail`), the return path
+(`psrp.mail` CNAME to `rp.email.oneabsolute.co.uk`) and `_dmarc.mail`.
+
+One setting lives outside this repo and outside Postal's own pages. Between Postal and SES
+sits a Postfix relay (container `postal-ses-relay` on the Postal box), and it accepts mail
+only from the sender domains named in its `ALLOWED_SENDER_DOMAINS` setting.
+`mail.wasiyyahwills.com` is on that list. If it ever goes missing, the site still reports
+success, Postal marks each message "Hard fail", and the relay's reply is
+`554 5.7.1 … Recipient address rejected: Access denied`. Postal's Messages page for the
+Wasiyyah server is the place to look when someone says a reset email never arrived.
 
 ### Backups
 

@@ -146,9 +146,10 @@ const sections: LegalSection[] = [
             card details go straight to Stripe and never reach our servers.
           </li>
           <li>
-            <strong>Resend</strong> delivers our emails. When you ask for a
-            password reset, we give Resend your email address and the reset
-            message so that it can deliver it.
+            <strong>Amazon Web Services</strong> delivers our emails, which
+            we send through a mail server we run ourselves. When you ask for
+            a password reset, your email address and the reset message pass
+            to Amazon SES, its email service, so that it can deliver them.
           </li>
         </ul>
         <p>
