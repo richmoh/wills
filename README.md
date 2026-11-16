@@ -141,13 +141,53 @@ Redeploy after changes:
 
 ```bash
 npm run deploy:check   # what a deploy would change; changes nothing
-npm run deploy         # check server → rsync → pnpm install and build → migrations → pm2 restart → checks
+npm run deploy         # check server → rsync → database copy and migrations → install and build → pm2 restart → checks
 ```
 
 `npm run redeploy` is the same as `npm run deploy`. With pnpm, use `pnpm run deploy`:
 `pnpm deploy` is a different, built-in pnpm command. The deploy sends this folder as it
 is, including uncommitted changes, and builds in place, so the site can misbehave
 between the start of the build and the restart.
+
+### Backups
+
+`/usr/local/bin/wasiyyah-backup` (from `deploy/wasiyyah-backup.sh`, installed by every
+deploy) runs at 03:10 server time from `/etc/cron.d/wasiyyah-backup` and writes to
+`/root/backups/wasiyyah/nightly`: one copy a day for 30 days, and the copy from the 1st
+of each month for a year. A copy is kept only if it is a readable archive holding the
+users, wills and payments tables. A deploy also keeps its own copy from just before its
+migrations (`/root/backups/wasiyyah/db-*.dump`, last 10).
+
+Nothing sends an alert when a night fails. `npm run deploy:check` (and every deploy)
+warns if the last good copy is more than 36 hours old; on the server
+`wasiyyah-backup --status` says when it was taken, and `/var/log/wasiyyah-backup.log`
+has a line per night.
+
+**These copies are on the same server as the database.** They cover a bad migration, a
+bug or a mistaken delete, not the loss of the server. No off-site copy is set up yet.
+
+### Restoring the database
+
+Both steps were run against a scratch database on 2026-11-16.
+
+```bash
+ssh root@185.241.151.231
+ls -lt /root/backups/wasiyyah/nightly/daily | head     # choose a copy
+COPY=/root/backups/wasiyyah/nightly/daily/wasiyyah-YYYY-MM-DD.dump
+
+# 1. Look first: load it into a scratch database and check what is in it.
+sudo -u postgres createdb wasiyyah_restore_check
+sudo -u postgres pg_restore --exit-on-error -d wasiyyah_restore_check < "$COPY"
+sudo -u postgres psql -d wasiyyah_restore_check -c "select count(*) from users" -c "select count(*) from wills"
+sudo -u postgres dropdb wasiyyah_restore_check
+
+# 2. To put it in place of the live database: stop the app, keep what is there now,
+#    restore over it, start the app. The copy carries the app role's grants.
+pm2 stop wasiyyah
+sudo -u postgres pg_dump -Fc wasiyyah > /root/backups/wasiyyah/db-before-restore.$(date +%Y%m%d%H%M%S).dump
+sudo -u postgres pg_restore --clean --if-exists --exit-on-error -d wasiyyah < "$COPY"
+pm2 start wasiyyah
+```
 
 ## Open questions for review
 

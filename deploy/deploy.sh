@@ -65,6 +65,14 @@ app_url=$(grep -E '^NEXT_PUBLIC_APP_URL=' .env.local | head -1 | cut -d= -f2- | 
 { has RESEND_API_KEY && has EMAIL_FROM; } || echo "   ! RESEND_API_KEY / EMAIL_FROM not set: password-reset emails will not send"
 { has STRIPE_SECRET_KEY && has STRIPE_WEBHOOK_SECRET; } || echo "   ! Stripe keys not set: payments stay switched off"
 
+# The nightly database copy fails silently if nobody looks, so look here.
+if [ -x /usr/local/bin/wasiyyah-backup ]; then
+  /usr/local/bin/wasiyyah-backup --status >/dev/null 2>&1 \
+    || echo "   ! the nightly database backup is missing or stale: $(/usr/local/bin/wasiyyah-backup --status 2>&1 | head -1 || true)"
+else
+  echo "   ! the nightly database backup is not installed yet (a deploy installs it)"
+fi
+
 # Builds are the memory spike on a server with no swap, and when memory runs
 # out the kernel may kill another app rather than this build.
 avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
@@ -106,11 +114,18 @@ DATABASE_URL=$(grep -E '^DATABASE_URL=' .env.local | head -1 | cut -d= -f2- | tr
 DB_NAME=$(printf '%s' "$DATABASE_URL" | sed -E 's|^[a-z]+://[^/]+/([^?]+).*|\1|')
 DB_USER=$(printf '%s' "$DATABASE_URL" | sed -E 's|^[a-z]+://([^:@/]+).*|\1|')
 
-# This database has no other backup, so keep a copy from before each deploy.
+# Besides the nightly copies, keep one from just before each deploy: it is the
+# one to go back to if this deploy's migrations turn out to be wrong.
 mkdir -p /root/backups/wasiyyah
 sudo -u postgres pg_dump -Fc "$DB_NAME" > "/root/backups/wasiyyah/db-$(date +%Y%m%d%H%M%S).dump"
 ls -1t /root/backups/wasiyyah/db-*.dump | tail -n +11 | xargs -r rm --
 echo "   ✓ database copied to /root/backups/wasiyyah (last 10 kept)"
+
+# The nightly backup job is installed from the repo on every deploy, so the
+# copy that runs can never drift from the one that is reviewed.
+install -m 755 deploy/wasiyyah-backup.sh /usr/local/bin/wasiyyah-backup
+install -m 644 deploy/wasiyyah-backup.cron /etc/cron.d/wasiyyah-backup
+echo "   ✓ nightly backup job installed (03:10, $(/usr/local/bin/wasiyyah-backup --status 2>&1 | head -1 || true))"
 
 for f in migrations/*.sql; do
   sudo -u postgres PGOPTIONS='-c client_min_messages=warning' \

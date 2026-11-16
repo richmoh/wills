@@ -1,0 +1,3 @@
+# /etc/cron.d/wasiyyah-backup — installed by `npm run deploy` from deploy/wasiyyah-backup.cron
+# Nightly copy of the Wasiyyah database at 03:10 server time (Europe/Berlin).
+10 3 * * * root /usr/local/bin/wasiyyah-backup >> /var/log/wasiyyah-backup.log 2>&1
