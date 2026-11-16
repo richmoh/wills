@@ -2,14 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { SiteHeader } from "@/components/SiteHeader";
-import { SiteFooter } from "@/components/SiteFooter";
-import {
-  DeleteWillButton,
-  LogoutButton,
-  NewWillButton,
-  UpgradeButton,
-} from "@/components/DashboardActions";
+import { PREMIUM_PRICE_PENCE } from "@/lib/stripe";
+import { AppHeader } from "@/components/AppHeader";
+import { NewWillButton } from "@/components/DashboardActions";
+import { PlanPanel } from "@/components/dashboard/PlanPanel";
+import { WillCard } from "@/components/dashboard/WillCard";
+import { summariseWill, type WillSummary } from "@/components/dashboard/will-summary";
 import { canMirror, normalizeWillData } from "@/lib/will-types";
 
 export const metadata = { title: "My wills" };
@@ -21,6 +19,25 @@ interface WillRow {
   updated_at: string;
   data: unknown;
 }
+
+const firstName = (full: string) => full.trim().split(/\s+/)[0];
+
+/** The line under the greeting: where the user's wills have got to. */
+function standing(wills: WillSummary[]): string {
+  if (wills.length === 0) return "You have not started your will yet.";
+  const one = wills.length === 1;
+  if (wills.every((w) => w.generated)) {
+    return one
+      ? "Your will is written. One step is left before it counts."
+      : "Your wills are written. One step is left before each of them counts.";
+  }
+  return `${
+    one ? "Your will is not finished yet." : "Not all of your wills are finished yet."
+  } What you have answered so far is saved.`;
+}
+
+const smallCard = "card flex flex-col gap-[14px] p-[clamp(24px,3vw,36px)]";
+const smallCardHeading = "text-[24px] leading-[1.3] font-bold tracking-[-0.02em]";
 
 export default async function Dashboard({
   searchParams,
@@ -44,137 +61,118 @@ export default async function Dashboard({
     (a) => canMirror(a.data) && !testators.has(a.data.spouseName.trim().toLowerCase())
   );
 
+  const summaries = wills.map((w, i) => summariseWill(w, answers[i].data, user.is_premium));
+  const generated = summaries.filter((s) => s.generated);
+  // a mirror will is part of the paid pack, so only paid accounts are offered one
+  const mirrors = user.is_premium ? mirrorable : [];
+
+  const pounds = PREMIUM_PRICE_PENCE / 100;
+  const price = `£${Number.isInteger(pounds) ? pounds : pounds.toFixed(2)}`;
+
   return (
     <>
-      <SiteHeader />
-      <main className="flex-1">
-        <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="font-display text-3xl font-semibold text-forest-900">
-                As-salamu alaykum, {user.full_name.split(" ")[0]}
-              </h1>
-              <p className="mt-1 text-sm text-ink/60">
-                {user.is_premium ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-3 py-1 text-xs font-semibold text-gold-600">
-                    ✦ Complete Will Pack — lifetime access
-                  </span>
-                ) : (
-                  "Free plan — one Essential Will included."
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-5">
-              <Link href="/account" className="text-sm font-medium text-ink/55 hover:text-forest-800">
-                Account
-              </Link>
-              <LogoutButton />
-            </div>
-          </div>
+      <AppHeader />
+      <main className="mx-auto flex w-full max-w-[1120px] flex-col gap-7 px-[clamp(20px,4vw,48px)] pt-14 pb-24">
+        <div>
+          <h1 className="h-page">As-salamu alaykum, {firstName(user.full_name)}</h1>
+          <p className="mt-2.5 text-ink-soft">{standing(summaries)}</p>
+        </div>
 
-          {upgraded && (
-            <div className="mt-6 rounded-2xl border border-forest-200 bg-forest-50 px-5 py-4 text-sm text-forest-800">
-              <strong>JazakAllahu khayran — your upgrade is complete.</strong>{" "}
-              The bequests, religious debts and letter-of-wishes steps are now
-              unlocked in your will, and your document pack includes the
-              executor guidance and estate checklist.
-            </div>
-          )}
+        {upgraded && (
+          <p role="status" className="rounded-[14px] bg-emerald-tint px-5 py-4 text-[17px]">
+            <strong>JazakAllahu khayran — your upgrade is complete.</strong>{" "}
+            The bequests, religious debts and letter-of-wishes steps are now
+            unlocked in your will, and your document pack includes the
+            executor guidance and estate checklist.
+          </p>
+        )}
 
-          <div className="mt-8 space-y-4">
-            {wills.length === 0 && (
-              <div className="card text-center">
-                <h2 className="font-display text-xl font-semibold text-forest-900">
-                  Your will awaits
-                </h2>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink/60">
-                  About 15 minutes of gentle questions. You can stop at any
-                  point — everything saves as you go.
+        {wills.length === 0 && (
+          <section className="card flex flex-col items-start gap-[14px]">
+            <h2 className="text-[28px] leading-[1.3] font-bold tracking-[-0.02em]">
+              Your will awaits
+            </h2>
+            <p className="max-w-[560px] text-ink-soft">
+              About 15 minutes of gentle questions. You can stop at any
+              point — everything saves as you go.
+            </p>
+            <div className="mt-2.5">
+              <NewWillButton label="Begin my will" className="btn-primary btn-lg" />
+            </div>
+            <p className="text-[16px] text-ink-mute">
+              {user.is_premium
+                ? "Complete Will Pack — lifetime access."
+                : "Free plan — one Essential Will included."}
+            </p>
+          </section>
+        )}
+
+        {summaries.map((s) => (
+          <WillCard key={s.id} will={s} />
+        ))}
+
+        {(generated.length > 0 || mirrors.length > 0) && (
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-7">
+            {generated.length > 0 && (
+              <section className={smallCard}>
+                <h2 className={smallCardHeading}>Has anything changed?</h2>
+                <p className="text-ink-soft">
+                  A birth, a death, a marriage, a divorce or a new home can all
+                  change the shares. Marriage cancels an earlier will altogether.
                 </p>
-                <div className="mt-5 flex justify-center">
-                  <NewWillButton label="Begin my will" />
-                </div>
-              </div>
+                {generated.length === 1 ? (
+                  <Link
+                    href={`/will/${generated[0].id}/edit`}
+                    className="btn-ghost mt-auto self-start"
+                  >
+                    Update my will
+                  </Link>
+                ) : (
+                  // with several wills, the update starts from the will it affects
+                  <p className="text-[16px] font-semibold">
+                    Choose &ldquo;Change my answers&rdquo; on the will it affects.
+                  </p>
+                )}
+              </section>
             )}
 
-            {wills.map((w) => (
-              <div key={w.id} className="card flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h2 className="font-display text-lg font-semibold text-forest-900">
-                      {w.label}
-                    </h2>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
-                        w.status === "complete"
-                          ? "bg-forest-100 text-forest-700"
-                          : "bg-gold-100 text-gold-600"
-                      }`}
-                    >
-                      {w.status === "complete" ? "Generated" : "Draft"}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-ink/50">
-                    Last edited{" "}
-                    {new Date(w.updated_at).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
+            {mirrors.map((m) => {
+              const spouse = m.data.spouseName.trim();
+              const name = firstName(spouse);
+              // the mirror will is for the other spouse, so a man's is for his wife
+              const wife = m.data.sex === "male";
+              return (
+                <section key={m.id} className={smallCard}>
+                  <h2 className={smallCardHeading}>A will for {name}</h2>
+                  <p className="text-ink-soft">
+                    {wife ? "Her" : "His"} mirror will starts from the answers you
+                    share: your address, your children and their guardians.{" "}
+                    {wife ? "She adds her" : "He adds his"} own parents and wishes.
                   </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <DeleteWillButton willId={w.id} />
-                  {w.status === "complete" && (
-                    <Link href={`/will/${w.id}/document`} className="btn-ghost !py-2">
-                      View document
-                    </Link>
-                  )}
-                  <Link href={`/will/${w.id}/edit`} className="btn-primary !py-2">
-                    {w.status === "complete" ? "Update" : "Continue"}
-                  </Link>
-                </div>
-              </div>
-            ))}
-
-            {wills.length > 0 && (
-              <div className="pt-2">
-                {user.is_premium ? (
-                  <div className="flex flex-wrap items-start gap-3">
-                    {mirrorable.map((m) => (
-                      <NewWillButton
-                        key={m.id}
-                        mirrorOf={m.id}
-                        label={`Create a mirror will for ${m.data.spouseName.trim()}`}
-                      />
-                    ))}
+                  <div className="mt-auto">
                     <NewWillButton
-                      label="Start another will"
-                      className={mirrorable.length > 0 ? "btn-ghost" : "btn-primary"}
+                      mirrorOf={m.id}
+                      label={`Create ${name}’s will`}
+                      ariaLabel={`Create ${name}’s will, a mirror will for ${spouse}`}
+                      className="btn-dark px-5"
                     />
                   </div>
-                ) : (
-                  <div className="card flex flex-wrap items-center justify-between gap-4 border-gold-300/60 bg-gold-100/30">
-                    <div className="max-w-lg">
-                      <h3 className="font-display text-base font-semibold text-forest-900">
-                        Complete Will Pack
-                      </h3>
-                      <p className="mt-1 text-sm leading-6 text-ink/65">
-                        Charitable bequests, religious-debts schedule, letter of
-                        wishes, executor guidance, the estate checklist, and a
-                        mirror will for your spouse. One payment, yours for
-                        life.
-                      </p>
-                    </div>
-                    <UpgradeButton />
-                  </div>
-                )}
-              </div>
-            )}
+                </section>
+              );
+            })}
           </div>
-        </div>
+        )}
+
+        {wills.length > 0 && (
+          <PlanPanel
+            isPremium={user.is_premium}
+            price={price}
+            spouseFirstName={
+              mirrorable.length > 0 ? firstName(mirrorable[0].data.spouseName) : undefined
+            }
+          />
+        )}
       </main>
-      <SiteFooter />
     </>
   );
 }

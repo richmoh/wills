@@ -7,11 +7,14 @@ export function NewWillButton({
   label = "Start a new will",
   mirrorOf,
   className = "btn-primary",
+  ariaLabel,
 }: {
   label?: string;
   /** create the spouse's will, pre-filled from this will */
   mirrorOf?: string;
   className?: string;
+  /** a fuller name for assistive technology; it should begin with the label */
+  ariaLabel?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -40,11 +43,17 @@ export function NewWillButton({
 
   return (
     <div>
-      <button onClick={create} disabled={busy} className={className}>
+      <button
+        type="button"
+        onClick={create}
+        disabled={busy}
+        aria-label={ariaLabel}
+        className={className}
+      >
         {busy ? "One moment…" : label}
       </button>
       {error && (
-        <p className="mt-3 max-w-md rounded-xl border border-gold-300 bg-gold-100/70 px-4 py-3 text-sm text-ink/80">
+        <p role="alert" className="note-warn mt-3 max-w-md text-[16px]">
           {error}
         </p>
       )}
@@ -79,27 +88,16 @@ export function UpgradeButton({ className = "btn-gold" }: { className?: string }
 
   return (
     <div>
-      <button onClick={upgrade} disabled={busy} className={className}>
+      <button type="button" onClick={upgrade} disabled={busy} className={className}>
         {busy ? "One moment…" : "Get the Complete Will Pack"}
       </button>
-      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      {/* a white panel, so it reads on the dark panels this button sits in as well */}
+      {error && (
+        <p role="alert" className="note-error mt-3 max-w-md text-[16px]">
+          {error}
+        </p>
+      )}
     </div>
-  );
-}
-
-export function LogoutButton() {
-  const router = useRouter();
-  return (
-    <button
-      className="text-sm font-medium text-ink/55 hover:text-forest-800"
-      onClick={async () => {
-        await fetch("/api/auth/logout", { method: "POST" });
-        router.push("/");
-        router.refresh();
-      }}
-    >
-      Sign out
-    </button>
   );
 }
 
@@ -109,29 +107,42 @@ export function DeleteWillButton({ willId }: { willId: string }) {
   if (!confirming) {
     return (
       <button
-        className="text-xs font-medium text-ink/45 hover:text-red-700"
+        type="button"
+        className="min-h-11 text-[16px] font-semibold text-ink-mute underline underline-offset-[0.18em] hover:text-clay"
         onClick={() => setConfirming(true)}
       >
-        Delete
+        Delete this will
       </button>
     );
   }
   return (
-    <span className="text-xs">
-      Delete this will?{" "}
-      <button
-        className="font-semibold text-red-700 hover:underline"
-        onClick={async () => {
-          await fetch(`/api/wills/${willId}`, { method: "DELETE" });
-          router.refresh();
-        }}
-      >
-        Yes, delete
-      </button>{" "}
-      ·{" "}
-      <button className="font-medium text-ink/55 hover:underline" onClick={() => setConfirming(false)}>
-        Keep it
-      </button>
-    </span>
+    <div
+      role="group"
+      aria-label="Delete this will?"
+      className="flex flex-wrap items-center gap-x-4 gap-y-3 text-[16px]"
+    >
+      <span className="font-semibold">Delete this will?</span>
+      <span className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          className="btn-ghost border-clay py-[9px] text-clay hover:border-clay hover:bg-clay hover:text-white"
+          onClick={async () => {
+            await fetch(`/api/wills/${willId}`, { method: "DELETE" });
+            router.refresh();
+          }}
+        >
+          Yes, delete
+        </button>
+        {/* focus lands on the safe choice, so the keyboard does not lose its place */}
+        <button
+          type="button"
+          autoFocus
+          className="btn-ghost py-[9px]"
+          onClick={() => setConfirming(false)}
+        >
+          Keep it
+        </button>
+      </span>
+    </div>
   );
 }

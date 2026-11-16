@@ -1,12 +1,64 @@
+import Image from "next/image";
 import Link from "next/link";
-import { SiteHeader } from "@/components/SiteHeader";
+import { ShareCalculator } from "@/components/home/ShareCalculator";
+import { ShareBar, type ShareSegment } from "@/components/Shares";
 import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SHARE_COLOURS } from "@/lib/share-colours";
 
-const exampleShares = [
-  { label: "Wife", fraction: "1/8", pct: 12.5, color: "#15804F" },
-  { label: "Two sons", fraction: "17/60 each", pct: 56.66, color: "#B08A18" },
-  { label: "Daughter", fraction: "17/120", pct: 14.17, color: "#4678B8" },
-  { label: "Mother", fraction: "1/6", pct: 16.67, color: "#B05F2A" },
+const COLUMN = "mx-auto max-w-[1240px] px-[clamp(20px,4vw,48px)]";
+const H2 = "text-[clamp(30px,3.4vw,44px)] leading-[1.08] font-bold tracking-[-0.03em]";
+
+// The worked example the page keeps returning to: a husband who leaves a wife,
+// two sons, a daughter and his mother, and an estate of £250,000.
+const EXAMPLE: (ShareSegment & { amount: string })[] = [
+  { key: "wife", label: "Wife", amount: "£31,250", n: 1, d: 8, ...SHARE_COLOURS.spouse },
+  { key: "sons", label: "Two sons", amount: "£141,667", n: 17, d: 30, ...SHARE_COLOURS.sons },
+  { key: "daughter", label: "Daughter", amount: "£35,417", n: 17, d: 120, ...SHARE_COLOURS.daughters },
+  { key: "mother", label: "Mother", amount: "£41,667", n: 1, d: 6, ...SHARE_COLOURS.mother },
+];
+
+const STEPS = [
+  {
+    image: "/illustrations/answering.jpg",
+    alt: "Illustration: a husband and wife on a sofa answering questions together on a laptop.",
+    numeral: "١",
+    title: "Answer about your family",
+    body: "Islamic law itself keeps the interview short: if a son survives you, your brothers cannot inherit, so you are never asked about them. Everything saves as you go.",
+  },
+  {
+    image: "/illustrations/shares-on-phone.jpg",
+    alt: "Illustration: hands holding a phone that shows a ring divided into shares.",
+    numeral: "٢",
+    title: "Watch the shares appear",
+    body: "Each answer updates the shares beside you, in exact fractions that are never rounded, with the reason for every one in plain English.",
+  },
+  {
+    image: "/illustrations/signing.jpg",
+    alt: "Illustration: a man signing his will at a table while two witnesses watch.",
+    numeral: "٣",
+    title: "Print it and sign it",
+    body: "Sign in front of two independent witnesses, exactly as the instructions describe, and your will takes legal effect. Come back and update it whenever your family changes.",
+  },
+];
+
+const QUESTIONS = [
+  {
+    q: "Will my will be legally valid?",
+    a: "A will takes effect in England & Wales when an adult with capacity signs it in front of two independent witnesses, who then sign it too. Ours is drafted to meet those requirements and comes with exact signing instructions. It has not yet been reviewed by a solicitor, and for anything beyond a straightforward estate we tell you when to ask one.",
+  },
+  {
+    q: "Which school of fiqh do you follow?",
+    a: "The rules the four Sunni schools agree on, which is almost everything, and the Hanafi position on the few points of difference. The working shows which rule was applied where.",
+  },
+  {
+    q: "What happens when my family changes?",
+    a: "Sign in, change the answer, and print a new will; it takes minutes. As a safety net, the will also directs your executors to apply the Islamic shares to the family you actually leave behind.",
+  },
+  {
+    q: "Is my information safe?",
+    a: "Your answers are used only to prepare your documents and are never sold or shared. You can download or delete everything from your account at any time.",
+  },
 ];
 
 export default function LandingPage() {
@@ -15,343 +67,400 @@ export default function LandingPage() {
       <SiteHeader />
       <main className="flex-1">
         {/* ============================== HERO ============================== */}
-        <section className="pattern-dark relative overflow-hidden bg-forest-950 text-white">
-          <div
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(36,135,98,0.35),transparent)]"
-            aria-hidden
-          />
-          <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-20 sm:px-6 lg:pb-32 lg:pt-28">
-            <div className="grid items-center gap-14 lg:grid-cols-2">
+        <section
+          className={`${COLUMN} flex flex-wrap items-center gap-x-16 gap-y-12 pt-10 pb-[88px]`}
+        >
+          <div className="min-w-0 flex-[1_1_440px]">
+            <p className="eyebrow mb-5">Islamic wills for England &amp; Wales</p>
+            <h1 className="text-[clamp(42px,5.4vw,72px)] leading-[1.02] font-extrabold tracking-[-0.035em]">
+              Every heir.
+              <br />
+              Their exact share.
+            </h1>
+            <p className="lede mt-7 max-w-[520px]">
+              Answer a few questions about your family. Wasiyyah works out the
+              Qur&rsquo;anic shares as exact fractions and writes them into a will
+              drafted for the law of England &amp; Wales. The will is free.
+            </p>
+            <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-4">
+              <Link href="/signup" className="btn-primary btn-lg">
+                Start my free will
+              </Link>
+              <a href="#sample" className="px-1 py-3 text-[17px] font-semibold text-ink">
+                See what you get
+              </a>
+            </div>
+            <ul className="mt-10 flex flex-wrap gap-x-9 gap-y-3 text-[16px] text-ink-soft">
+              <li className="flex flex-col">
+                <strong className="text-[26px] tracking-[-0.02em] text-ink">About 15 minutes</strong>
+                from first question to finished will
+              </li>
+              <li className="flex flex-col">
+                <strong className="text-[26px] tracking-[-0.02em] text-ink">
+                  12&ndash;18 questions
+                </strong>
+                for most families
+              </li>
+              <li className="flex flex-col">
+                <strong className="text-[26px] tracking-[-0.02em] text-ink">&pound;0</strong>
+                no card needed
+              </li>
+            </ul>
+          </div>
+
+          <ShareCalculator className="min-w-0 flex-[1_1_500px]" />
+        </section>
+
+        {/* ====================== WITHOUT A WILL / WITH ====================== */}
+        <section className="border-y border-line bg-white">
+          <div className={`${COLUMN} flex flex-wrap gap-x-[72px] gap-y-10 py-[88px]`}>
+            <div className="min-w-0 flex-[1_1_360px]">
+              <h2 className={H2}>
+                Without a will, English law divides your estate. Not the Qur&rsquo;an.
+              </h2>
+              <p className="mt-5 text-ink-soft">
+                The intestacy rules of England &amp; Wales take no account of the Islamic
+                shares. A will is how you make those shares binding on your estate, name
+                guardians for your children and record your wish for an Islamic burial.
+              </p>
+            </div>
+            <div className="flex min-w-0 flex-[1.3_1_480px] flex-col gap-7">
+              <p className="text-[16px] text-ink-soft">
+                Example: a husband leaves a wife, two sons, a daughter and his mother, and
+                an estate of &pound;250,000.
+              </p>
               <div>
-                <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-forest-200">
-                  For Muslims in England &amp; Wales
-                </p>
-                <h1 className="mt-6 font-display text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                  Your Islamic will,
-                  <br />
-                  <span className="text-gold-300">done properly.</span>
-                </h1>
-                <p className="mt-6 max-w-lg text-lg leading-8 text-white/75">
-                  A clearly drafted will that follows the Qur&rsquo;anic
-                  shares <em>exactly</em> and is written for the law of
-                  England &amp; Wales — from a guided interview that takes
-                  about 15 minutes.
-                </p>
-                <div className="mt-8 flex flex-wrap items-center gap-4">
-                  <Link href="/signup" className="btn-gold !px-8 !py-3.5 !text-base">
-                    Start my will — free
-                  </Link>
-                  <Link
-                    href="#how-it-works"
-                    className="text-sm font-semibold text-white/80 hover:text-white"
-                  >
-                    See how it works ↓
-                  </Link>
+                <h3 className="mb-[10px] text-[18px] font-bold">Without a will</h3>
+                <div className="flex h-14 overflow-hidden rounded-xl">
+                  <div className="flex flex-1 items-center bg-emerald px-[18px] font-bold text-white">
+                    Wife &middot; &pound;250,000
+                  </div>
                 </div>
-                <ul className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-white/60">
-                  <li className="flex items-center gap-2">
-                    <Tick /> Exact fara&rsquo;id shares
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Tick /> Signing steps for the Wills Act 1837
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Tick /> A complete will, free
-                  </li>
-                </ul>
+                <p className="mt-[10px] text-[16px] text-ink-soft">
+                  The whole estate passes to his wife. His children and his mother receive
+                  nothing.
+                </p>
               </div>
-
-              {/* live-look example card */}
-              <div className="relative">
-                <p
-                  className="pointer-events-none absolute -top-16 right-0 select-none font-arabic text-[10rem] leading-none text-white/[0.05]"
-                  lang="ar"
-                  dir="rtl"
-                  aria-hidden
-                >
-                  وصية
-                </p>
-                <div className="relative rounded-3xl border border-white/10 bg-white p-6 text-ink shadow-2xl">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="font-display text-lg font-semibold text-forest-900">
-                      Inheritance shares
-                    </h3>
-                    <span className="text-xs text-ink/50">example — husband &amp; father of three</span>
-                  </div>
-                  <div className="mt-4 flex h-8 w-full gap-[2px] overflow-hidden rounded-lg">
-                    {exampleShares.map((s) => (
-                      <div
-                        key={s.label}
-                        style={{ width: `${s.pct}%`, backgroundColor: s.color }}
-                        className="flex items-center justify-center"
-                      >
-                        {s.pct > 13 && (
-                          <span className="text-[11px] font-semibold text-white">
-                            {s.pct.toFixed(0)}%
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <ul className="mt-4 space-y-2.5 text-sm">
-                    {exampleShares.map((s) => (
-                      <li key={s.label} className="flex items-center gap-2.5">
-                        <span
-                          className="h-3 w-3 rounded-[4px]"
-                          style={{ backgroundColor: s.color }}
-                        />
-                        <span className="font-medium">{s.label}</span>
-                        <span className="ml-auto font-display font-semibold text-forest-800">
-                          {s.fraction}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-4 rounded-xl bg-forest-50 px-3 py-2 text-xs leading-5 text-forest-800">
-                    Every share traced to its source — Qur&rsquo;an 4:11, 4:12
-                    and 4:176 — with the working shown.
-                  </p>
-                </div>
+              <div>
+                <h3 className="mb-[10px] text-[18px] font-bold">With his Wasiyyah will</h3>
+                <ShareBar segments={EXAMPLE} className="h-14 rounded-xl text-[15px]" />
+                <ul className="mt-[14px] flex flex-wrap gap-x-7 gap-y-2 text-[16px] text-ink-soft">
+                  {EXAMPLE.map((s) => (
+                    <li key={s.key} className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="h-3 w-3 flex-none rounded-[3px]"
+                        style={{ background: s.fill }}
+                      />
+                      {s.label} {s.amount}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ============================ WHY ============================ */}
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <div className="max-w-2xl">
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-forest-900">
-              Two nights is the limit the Prophet ﷺ set
-            </h2>
-            <p className="mt-4 text-[15px] leading-7 text-ink/70">
-              <em>
-                &ldquo;It is not right for a Muslim who has something concerning
-                which a will should be made to spend two nights without his
-                will being written down with him.&rdquo;
-              </em>{" "}
-              — al-Bukhari &amp; Muslim. Yet most British Muslims have no will
-              at all.
+        {/* ========================== WHAT YOU GET ========================== */}
+        <section
+          id="sample"
+          className={`${COLUMN} flex flex-wrap items-center gap-x-[72px] gap-y-12 py-24`}
+        >
+          <div className="min-w-0 flex-[1_1_440px] rounded-3xl bg-[#E6EBE7] p-[clamp(20px,4vw,44px)]">
+            <article className="bg-white p-[clamp(24px,4vw,48px)] font-serif text-[15px] leading-[1.6] text-doc shadow-[0_18px_40px_-24px_rgba(15,31,26,0.45)]">
+              <p lang="ar" dir="rtl" className="text-center font-arabic text-[22px]">
+                بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+              </p>
+              <h3 className="mt-[14px] mb-1 text-center text-[24px] font-semibold">
+                Last Will and Testament
+              </h3>
+              <p className="mb-[18px] text-center text-doc-soft">
+                of BILAL AHMED, of 12 Example Road, Birmingham
+              </p>
+              <p className="mb-[6px] font-semibold">
+                7. Residuary estate &mdash; the Islamic shares
+              </p>
+              <p className="mb-3">
+                I give the residue of my estate, after payment of the above, to my heirs
+                under the Islamic law of inheritance in the shares set out below&hellip;
+              </p>
+              <table className="w-full border-collapse text-[14px]">
+                <thead>
+                  <tr className="border-b-2 border-doc">
+                    <th scope="col" className="py-[6px] text-left">
+                      Heir
+                    </th>
+                    <th scope="col" className="py-[6px] text-left">
+                      Share
+                    </th>
+                    <th scope="col" className="py-[6px] text-right">
+                      Equivalent
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-doc-line">
+                    <td className="py-[7px]">Wife &mdash; Maryam Ahmed</td>
+                    <td>1/8</td>
+                    <td className="text-right">12.50%</td>
+                  </tr>
+                  <tr className="border-b border-doc-line">
+                    <td className="py-[7px]">2 sons &mdash; Yusuf, Idris</td>
+                    <td>17/30 (17/60 each)</td>
+                    <td className="text-right">56.67%</td>
+                  </tr>
+                  <tr className="border-b border-doc-line">
+                    <td className="py-[7px]">Daughter &mdash; Hana</td>
+                    <td>17/120</td>
+                    <td className="text-right">14.17%</td>
+                  </tr>
+                  <tr>
+                    <td className="py-[7px]">Mother &mdash; Khadija Begum</td>
+                    <td>1/6</td>
+                    <td className="text-right">16.67%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </article>
+          </div>
+          <div className="min-w-0 flex-[1_1_400px]">
+            <h2 className={H2}>A will you can read, print and sign tonight.</h2>
+            <p className="mt-5 mb-7 text-ink-soft">
+              Plain English, numbered clauses, every heir named with their fraction. It
+              comes with the one thing most home-made wills get wrong: exact instructions
+              for signing it.
             </p>
-          </div>
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {[
-              {
-                title: "Without a will, English law decides",
-                body: "The intestacy rules hand your estate out in fixed portions that ignore the Qur'anic shares entirely — a spouse may take everything while parents and siblings receive nothing of their haqq.",
-              },
-              {
-                title: "A will makes fara'id legally binding",
-                body: "England & Wales gives you almost complete testamentary freedom. Your will simply directs your estate to the Qur'anic heirs in the Qur'anic fractions — and the law will enforce it.",
-              },
-              {
-                title: "Your children, your choice",
-                body: "Your will appoints guardians you trust to raise your children in the deen, and executors who understand that debts — including zakat — come before everything.",
-              },
-            ].map((c) => (
-              <div key={c.title} className="card">
-                <h3 className="font-display text-lg font-semibold text-forest-900">
-                  {c.title}
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-ink/65">{c.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ======================== HOW IT WORKS ======================== */}
-        <section id="how-it-works" className="pattern-light bg-paper-dark py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-forest-900">
-              Fifteen minutes, three steps
-            </h2>
-            <div className="mt-12 grid gap-10 md:grid-cols-3">
-              {[
-                {
-                  n: "١",
-                  title: "Answer gentle questions",
-                  body: "Family, executors, guardians, wishes. The interview is smart: rules of exclusion (hajb) mean you're never asked about relatives who cannot inherit. Most people answer 12–18 questions.",
-                },
-                {
-                  n: "٢",
-                  title: "Watch your shares appear",
-                  body: "As you answer, the Qur'anic shares are calculated live in exact fractions — never rounded — with every rule cited so you (or your imam) can verify the working.",
-                },
-                {
-                  n: "٣",
-                  title: "Print, sign, done",
-                  body: "Your will is drafted for England & Wales with step-by-step signing instructions. Sign it with two independent witnesses, exactly as the instructions describe, and your wasiyyah takes legal effect.",
-                },
-              ].map((s) => (
-                <div key={s.title}>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-forest-800 font-arabic text-2xl text-gold-300">
-                    {s.n}
-                  </div>
-                  <h3 className="mt-5 font-display text-xl font-semibold text-forest-900">
-                    {s.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-ink/65">{s.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ===================== INHERITANCE EXPLAINER ===================== */}
-        <section id="inheritance" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
-            <div>
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-forest-900">
-                Fractions set by revelation, enforced by English law
-              </h2>
-              <p className="mt-4 text-[15px] leading-7 text-ink/70">
-                Inheritance is one of the few matters the Qur&rsquo;an legislates
-                in precise fractions — a half, a quarter, an eighth, two-thirds,
-                a third, a sixth. The Prophet ﷺ urged the ummah to learn this
-                knowledge, and it is a duty on the community to uphold it.
-              </p>
-              <p className="mt-4 text-[15px] leading-7 text-ink/70">
-                Wasiyyah computes your family&rsquo;s shares the way the
-                classical scholars did — exact fractions, the rules of exclusion,
-                proportional adjustment (&lsquo;awl) and return (radd) — and then
-                expresses them in a will English courts enforce.
-              </p>
-              <ul className="mt-6 space-y-3 text-sm text-ink/75">
-                <li className="flex gap-3"><TickDark /> Sunni fiqh, with the Hanafi position where schools differ — always disclosed</li>
-                <li className="flex gap-3"><TickDark /> Rule-by-rule working shown for scholar review</li>
-                <li className="flex gap-3"><TickDark /> Up to one-third wasiyya for charity and non-heirs, cap enforced</li>
-                <li className="flex gap-3"><TickDark /> Religious debts — zakat, fidya, Hajj — paid first, as debts</li>
-              </ul>
-            </div>
-            <div className="rounded-3xl border border-forest-100 bg-forest-50 p-8">
-              <blockquote className="text-[15px] leading-7 text-forest-900">
-                <p className="font-arabic text-xl leading-9" lang="ar" dir="rtl">
-                  يُوصِيكُمُ اللَّهُ فِي أَوْلَادِكُمْ ۖ لِلذَّكَرِ مِثْلُ حَظِّ الْأُنثَيَيْنِ
-                </p>
-                <p className="mt-4 italic text-forest-800/80">
-                  &ldquo;Allah instructs you concerning your children: for the
-                  male, what is equal to the share of two females…&rdquo;
-                </p>
-                <footer className="mt-3 text-sm font-semibold text-forest-700">
-                  — Surah an-Nisa, 4:11
-                </footer>
-              </blockquote>
-              <p className="mt-6 border-t border-forest-200 pt-5 text-sm leading-6 text-forest-900/70">
-                These verses close with a warning and a promise — gardens
-                beneath which rivers flow for those who keep Allah&rsquo;s
-                limits. A written will is how you keep them after you.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* ========================== PRICING =========================== */}
-        <section className="bg-forest-950 py-20 text-white">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <div className="max-w-2xl">
-              <h2 className="font-display text-3xl font-semibold tracking-tight">
-                Free for every Muslim. More for those who want it.
-              </h2>
-              <p className="mt-4 text-white/70">
-                The Essential Will is a complete will, ready to sign — free,
-                because no one should be without a wasiyyah. The Complete Will Pack is a
-                single payment, never a subscription.
-              </p>
-            </div>
-            <div className="mt-12 grid gap-6 md:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-                <h3 className="font-display text-xl font-semibold">Essential Will</h3>
-                <p className="mt-1 font-display text-4xl font-semibold">£0</p>
-                <ul className="mt-6 space-y-3 text-sm text-white/80">
-                  <li className="flex gap-3"><Tick /> Full guided interview &amp; exact fara&rsquo;id shares</li>
-                  <li className="flex gap-3"><Tick /> Complete will: executors, guardians, burial wishes, Islamic shares</li>
-                  <li className="flex gap-3"><Tick /> Signing instructions for England &amp; Wales</li>
-                  <li className="flex gap-3"><Tick /> Print-ready PDF</li>
-                </ul>
-                <div className="mt-8">
-                  <Link href="/signup" className="btn-ghost w-full !border-white/25 !text-white hover:!bg-white/10">
-                    Start free
-                  </Link>
-                </div>
-              </div>
-              <div className="relative rounded-3xl border-2 border-gold-400 bg-gradient-to-b from-white/10 to-white/5 p-8">
-                <span className="absolute -top-3.5 left-8 rounded-full bg-gold-500 px-4 py-1 text-xs font-bold uppercase tracking-wide text-forest-950">
-                  One payment, forever
+            <ul className="flex flex-col gap-[18px]">
+              <li className="flex gap-[14px]">
+                <Check />
+                <span>
+                  <strong>Your will.</strong>{" "}Executors, guardians for your children,
+                  Islamic burial directions, and your estate in the Qur&rsquo;anic shares.
                 </span>
-                <h3 className="font-display text-xl font-semibold">Complete Will Pack</h3>
-                <p className="mt-1 font-display text-4xl font-semibold">
-                  £39 <span className="text-base font-normal text-white/60">once</span>
-                </p>
-                <ul className="mt-6 space-y-3 text-sm text-white/85">
-                  <li className="flex gap-3"><Gold /> Everything in Essential</li>
-                  <li className="flex gap-3"><Gold /> Charitable bequests (wasiyya) — one-third cap enforced</li>
-                  <li className="flex gap-3"><Gold /> Religious-debts schedule: zakat, fidya, kaffarah, Hajj</li>
-                  <li className="flex gap-3"><Gold /> Letter of wishes to your family</li>
-                  <li className="flex gap-3"><Gold /> Executor guidance pack &amp; estate checklist</li>
-                  <li className="flex gap-3"><Gold /> Mirror will for your spouse + unlimited updates</li>
-                </ul>
-                <div className="mt-8">
-                  <Link href="/pricing" className="btn-gold w-full">
-                    Get the Complete Pack
-                  </Link>
-                </div>
-              </div>
+              </li>
+              <li className="flex gap-[14px]">
+                <Check />
+                <span>
+                  <strong>How to sign it.</strong> Who can witness, who must not, and what
+                  to do in what order, under the Wills Act 1837.
+                </span>
+              </li>
+              <li className="flex gap-[14px]">
+                <Check />
+                <span>
+                  <strong>The working.</strong> Each share with the rule and the verse
+                  behind it, to show your imam or scholar.
+                </span>
+              </li>
+            </ul>
+            <p className="mt-7 text-[16px] text-ink-soft">
+              The Complete Will Pack adds bequests to charity, a religious-debts schedule,
+              a letter of wishes, a guide for your executors and a mirror will for your
+              spouse.{" "}
+              <Link href="/pricing" className="font-semibold">
+                Compare the two
+              </Link>
+            </p>
+          </div>
+        </section>
+
+        {/* ========================== HOW IT WORKS ========================== */}
+        <section id="how" className="border-y border-line bg-white">
+          <div className={`${COLUMN} py-24`}>
+            <h2 className={`${H2} mb-12 max-w-[640px]`}>
+              Three steps. Most people finish in one sitting.
+            </h2>
+            <ol className="grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-x-12 gap-y-10">
+              {STEPS.map((step) => (
+                <li key={step.title}>
+                  <Image
+                    src={step.image}
+                    alt={step.alt}
+                    width={1400}
+                    height={1045}
+                    sizes="(min-width: 1020px) 350px, (min-width: 660px) 46vw, 100vw"
+                    className="mb-6 block aspect-[4/3] h-auto w-full rounded-[20px] object-cover"
+                  />
+                  <p lang="ar" className="font-arabic text-[64px] leading-none text-emerald">
+                    {step.numeral}
+                  </p>
+                  <h3 className="mt-[18px] mb-2 text-[24px] font-bold tracking-[-0.02em]">
+                    {step.title}
+                  </h3>
+                  <p className="text-ink-soft">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* =========================== THE WORKING =========================== */}
+        <section id="working" className="bg-deep text-white">
+          <div className={`${COLUMN} flex flex-wrap gap-x-[72px] gap-y-12 py-[104px]`}>
+            <div className="min-w-0 flex-[1_1_420px]">
+              <p
+                lang="ar"
+                dir="rtl"
+                className="mb-3 text-left font-arabic text-[34px] leading-[1.7] text-saffron"
+              >
+                يُوصِيكُمُ اللَّهُ فِي أَوْلَادِكُمْ ۖ لِلذَّكَرِ مِثْلُ حَظِّ الْأُنثَيَيْنِ
+              </p>
+              <p className="mb-10 text-[16px] text-mist">
+                &ldquo;Allah instructs you concerning your children: for the male, what is
+                equal to the share of two females.&rdquo; Surah an-Nisa, 4:11
+              </p>
+              <h2 className={H2}>
+                We would rather show our working than ask for your trust.
+              </h2>
+              <p className="mt-5 text-mist">
+                The shares follow the rules the four Sunni schools agree on, and the Hanafi
+                position on the few points where they differ. Every rule applied to your
+                family is listed with its source.
+              </p>
+              <p className="mt-4 text-mist">
+                Wasiyyah is a self-help service, not a law firm, and its calculation and
+                wording have not yet been independently reviewed by a scholar or a
+                solicitor. So take the working to someone you trust. It is written to be
+                checked.
+              </p>
+            </div>
+            <div className="min-w-0 flex-[1_1_420px] rounded-3xl bg-[#0F3A2E] p-[clamp(24px,3vw,36px)]">
+              <h3 className="mb-5 text-[16px] font-bold tracking-[0.08em] text-saffron uppercase">
+                The working for the example above
+              </h3>
+              <ol className="flex flex-col gap-5">
+                <li className="flex items-start gap-[18px]">
+                  <WorkingFraction>1/8</WorkingFraction>
+                  <span>
+                    <strong>Wife.</strong>{" "}One-eighth, the wife&rsquo;s share when the
+                    deceased leaves descendants.{" "}
+                    <span className="text-mist">Qur&rsquo;an 4:12</span>
+                  </span>
+                </li>
+                <li className="flex items-start gap-[18px]">
+                  <WorkingFraction>1/6</WorkingFraction>
+                  <span>
+                    <strong>Mother.</strong>{" "}One-sixth, the mother&rsquo;s share when the
+                    deceased leaves descendants.{" "}
+                    <span className="text-mist">Qur&rsquo;an 4:11</span>
+                  </span>
+                </li>
+                <li className="flex items-start gap-[18px]">
+                  <WorkingFraction>17/24</WorkingFraction>
+                  <span>
+                    <strong>Children.</strong> The remainder, two shares to each son for
+                    every one to a daughter: 17/60 to each son, 17/120 to the daughter.{" "}
+                    <span className="text-mist">Qur&rsquo;an 4:11</span>
+                  </span>
+                </li>
+                <li className="flex items-start gap-[18px]">
+                  <WorkingFraction>0</WorkingFraction>
+                  <span>
+                    <strong>Brothers and sisters.</strong> Excluded by a surviving son, so
+                    the interview never asks about them.
+                  </span>
+                </li>
+              </ol>
             </div>
           </div>
         </section>
 
-        {/* ============================ FAQ ============================= */}
-        <section className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
-          <h2 className="text-center font-display text-3xl font-semibold tracking-tight text-forest-900">
-            Questions, answered honestly
+        {/* ============================= PRICING ============================= */}
+        <section className={`${COLUMN} py-24`}>
+          <h2 className={`${H2} max-w-[700px]`}>
+            The will is free. The extras are &pound;39, once.
           </h2>
-          <div className="mt-10 space-y-4">
-            {[
-              {
-                q: "Will my will be legally valid?",
-                a: "A will takes effect in England & Wales when an adult with capacity signs it in front of two independent witnesses, who then sign it too. English law lets you leave your estate as you wish, so a will in the Qur'anic shares is treated like any other. Ours is drafted to meet those requirements and comes with exact signing instructions — but Wasiyyah is a self-help service, not a law firm, and its wording has not yet been reviewed by a solicitor. For anything beyond a straightforward estate we tell you when to ask one.",
-              },
-              {
-                q: "Which school of fiqh do you follow?",
-                a: "The rules the four Sunni schools agree on — which is almost everything — plus the Hanafi position on the few points of difference. Every rule applied to your family is shown in the working, so you can take it to your own imam or scholar; the calculation has not yet had an independent scholarly review, and we would rather show our working than ask for your trust.",
-              },
-              {
-                q: "What happens when my family changes?",
-                a: "Your will includes a clause directing your executors to apply the Islamic shares to the family you actually leave behind, verified by a qualified scholar — and you can regenerate the document at any time.",
-              },
-            ].map((f) => (
-              <details key={f.q} className="card group">
-                <summary className="cursor-pointer select-none font-display text-base font-semibold text-forest-900 marker:content-none">
-                  {f.q}
-                </summary>
-                <p className="mt-3 text-sm leading-6 text-ink/65">{f.a}</p>
-              </details>
-            ))}
-          </div>
-          <p className="mt-8 text-center">
-            <Link href="/faq" className="font-semibold text-forest-800 hover:underline">
-              Read the full FAQ →
-            </Link>
+          <p className="mt-5 mb-11 max-w-[640px] text-ink-soft">
+            Writing a wasiyyah is a duty, and cost should never be the reason a Muslim is
+            without one. The paid pack keeps the service running for everyone.
           </p>
-        </section>
-
-        {/* ========================== FINAL CTA ========================== */}
-        <section className="pattern-dark bg-forest-900 py-16 text-center text-white">
-          <div className="mx-auto max-w-2xl px-4">
-            <p className="font-arabic text-3xl text-gold-300" lang="ar" dir="rtl">
-              وصية
-            </p>
-            <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight">
-              Tonight could be the first of the two nights.
-            </h2>
-            <p className="mt-4 text-white/70">
-              Fifteen minutes now. Peace of mind for your family, and your
-              affairs in order before Allah.
-            </p>
-            <div className="mt-8">
-              <Link href="/signup" className="btn-gold !px-10 !py-4 !text-base">
-                Write my will now
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-6">
+            <div className="flex flex-col gap-5 rounded-3xl border border-line bg-white p-9">
+              <div>
+                <h3 className="text-[22px] font-bold">Essential Will</h3>
+                <p className="mt-[6px] text-[56px] leading-none font-extrabold tracking-[-0.04em]">
+                  &pound;0
+                </p>
+              </div>
+              <ul className="flex flex-1 list-disc flex-col gap-2 pl-[22px] text-ink-soft">
+                <li>The full interview, with live shares and the working</li>
+                <li>
+                  A complete will: executors, guardians, burial wishes, the Islamic shares
+                </li>
+                <li>Signing instructions for England &amp; Wales</li>
+                <li>One will per account</li>
+              </ul>
+              <Link href="/signup" className="btn-primary px-6 py-[15px] text-[18px]">
+                Start my free will
               </Link>
             </div>
+            <div className="flex flex-col gap-5 rounded-3xl bg-ink p-9 text-white">
+              <div>
+                <h3 className="text-[22px] font-bold">Complete Will Pack</h3>
+                {/* a wrapping row, so on a phone the terms drop below the price in one piece */}
+                <p className="mt-[6px] flex flex-wrap items-baseline gap-x-[9px] gap-y-1 text-[56px] leading-none font-extrabold tracking-[-0.04em]">
+                  &pound;39
+                  <span className="text-[18px] leading-[1.3] font-medium tracking-normal text-mist">
+                    one payment, no subscription
+                  </span>
+                </p>
+              </div>
+              <ul className="flex flex-1 list-disc flex-col gap-2 pl-[22px] text-mist">
+                <li>Everything in Essential</li>
+                <li>
+                  Bequests to charity and to relatives who are not heirs, kept within
+                  one-third
+                </li>
+                <li>Religious-debts schedule: zakat, fidya, kaffarah, Hajj</li>
+                <li>Letter of wishes, executor guide and estate checklist</li>
+                <li>A mirror will for your spouse, and unlimited updates</li>
+              </ul>
+              <Link href="/pricing" className="btn-gold px-6 py-[15px] text-[18px]">
+                See everything in the pack
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ============================ QUESTIONS ============================ */}
+        <section className="border-t border-line bg-white">
+          <div className="mx-auto max-w-[860px] px-[clamp(20px,4vw,48px)] py-24">
+            <h2 className={`${H2} mb-8`}>Straight answers</h2>
+            {QUESTIONS.map((item) => (
+              <details key={item.q} className="border-t border-line py-[6px] last-of-type:border-b">
+                <summary className="py-4 text-[20px] font-bold">{item.q}</summary>
+                <p className="mb-5 text-ink-soft">{item.a}</p>
+              </details>
+            ))}
+            {/* the padding makes the link a 44px target; the margins take it back out */}
+            <p className="mt-5">
+              <Link href="/faq" className="-mb-2 inline-block py-2 font-bold">
+                All questions
+              </Link>
+            </p>
+          </div>
+        </section>
+
+        {/* ============================= CLOSING ============================= */}
+        <section className="bg-emerald text-white">
+          <div className="mx-auto max-w-[900px] px-[clamp(20px,4vw,48px)] py-24 text-center">
+            <Image
+              src="/illustrations/family.jpg"
+              alt="Illustration: three generations of a family at home together."
+              width={1400}
+              height={781}
+              sizes="(min-width: 720px) 640px, 100vw"
+              className="mx-auto mb-12 block aspect-video h-auto w-full max-w-[640px] rounded-3xl object-cover"
+            />
+            <blockquote className="mx-auto max-w-[720px] text-[clamp(24px,2.6vw,32px)] leading-[1.35] font-semibold tracking-[-0.02em]">
+              &ldquo;It is not right for a Muslim who has something concerning which a will
+              should be made to spend two nights without his will being written down with
+              him.&rdquo;
+            </blockquote>
+            <p className="mt-4 mb-9 text-[16px] text-[#D5EBE2]">al-Bukhari and Muslim</p>
+            <Link href="/signup" className="btn-white btn-lg px-8">
+              Write mine tonight
+            </Link>
           </div>
         </section>
       </main>
@@ -360,24 +469,29 @@ export default function LandingPage() {
   );
 }
 
-function Tick() {
+function Check() {
   return (
-    <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0 fill-forest-400" aria-hidden>
-      <path d="M10 0a10 10 0 100 20 10 10 0 000-20zm4.6 7.1l-5.3 6.2a1 1 0 01-1.5 0L5.4 10.6a1 1 0 111.5-1.3l1.7 1.9 4.5-5.4a1 1 0 111.5 1.3z" />
+    <svg
+      aria-hidden="true"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="mt-[3px] flex-none text-emerald"
+    >
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   );
 }
-function TickDark() {
+
+function WorkingFraction({ children }: { children: React.ReactNode }) {
   return (
-    <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0 fill-forest-600" aria-hidden>
-      <path d="M10 0a10 10 0 100 20 10 10 0 000-20zm4.6 7.1l-5.3 6.2a1 1 0 01-1.5 0L5.4 10.6a1 1 0 111.5-1.3l1.7 1.9 4.5-5.4a1 1 0 111.5 1.3z" />
-    </svg>
-  );
-}
-function Gold() {
-  return (
-    <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0 fill-gold-400" aria-hidden>
-      <path d="M10 0l2.4 6.9L20 7.6l-5.6 4.8L16.2 20 10 15.8 3.8 20l1.8-7.6L0 7.6l7.6-.7L10 0z" />
-    </svg>
+    <span className="w-16 flex-none text-[26px] font-extrabold tracking-[-0.02em]">
+      {children}
+    </span>
   );
 }

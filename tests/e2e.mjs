@@ -56,13 +56,16 @@ const fewer = (label, times = 1) => {
   const b = page.getByRole("button", { name: `decrease ${label}`, exact: true });
   return (async () => { for (let i = 0; i < times; i++) await b.click(); })();
 };
-const next = () => page.getByRole("button", { name: "Continue", exact: true }).click();
+// the button names the step it leads to: "Continue to marriage"
+const next = () => page.getByRole("button", { name: /^Continue/ }).click();
 // Next.js adds its own hidden role=alert element for route announcements
 const alertText = () => page.locator("[role=alert]:not(#__next-route-announcer__)").first().textContent();
 const expectStep = async (title) => {
   await page.locator("main h1", { hasText: title }).first().waitFor({ timeout: 10000 });
 };
-const saved = () => page.getByText("Saved ✓").waitFor({ timeout: 10000 });
+const saved = () => page.locator('[data-save-state="saved"]').waitFor({ state: "attached", timeout: 10000 });
+// the live shares sit beside the questions, outside <main>
+const sharesText = () => page.getByRole("complementary", { name: "Your shares so far" }).textContent();
 const put = (id, data, status) =>
   api.put(`${BASE}/api/wills/${id}`, { data: status ? { data, status } : { data } });
 
@@ -173,7 +176,7 @@ await expectStep("About your estate");
 await choose("Do you own your home?", "Yes — as joint tenants");
 await next();
 
-await expectStep("Review");
+await expectStep("Check your answers");
 let text = await page.textContent("main");
 check(text.includes("joint tenants"), "review raises the joint-tenancy flag");
 check(text.includes("1/8") && text.includes("17/60 each"), "review shows the exact shares");
@@ -195,9 +198,9 @@ check((await api.post(`${BASE}/api/wills`, { data: { mirrorOf: willId } })).stat
 // ================= the family that used to get the wrong shares =================
 // no children, both parents living, two brothers: the brothers inherit nothing,
 // but they take the mother from a third to a sixth
-await page.getByRole("link", { name: /edit answers/i }).click();
+await page.getByRole("link", { name: /change my answers/i }).click();
 await page.waitForURL("**/edit");
-await expectStep("Review"); // resumes where the user left off
+await expectStep("Check your answers"); // resumes where the user left off
 await page.getByRole("button", { name: "Edit Your children" }).click();
 await expectStep("Your children");
 await fewer("Sons living", 2);
@@ -213,14 +216,14 @@ await expectStep("Your brothers and sisters");
 check((await page.textContent("main")).includes("will not inherit while your father"), "siblings are asked about even though the father excludes them");
 await more("Full brothers", 2);
 await page.waitForTimeout(200);
-text = await page.textContent("main");
+text = await sharesText();
 check(text.includes("7/12") && text.includes("1/6") && text.includes("1/4"), "wife 1/4, mother 1/6, father 7/12 with two brothers");
 check(!text.includes("1/2"), "the father is not given a half (the old wrong answer)");
-check(text.includes("does not inherit"), "the excluded brothers are shown with the reason");
+check(/your 2 full brothers do not inherit/i.test(text), "the excluded brothers are shown with the reason");
 await shot("08-siblings-reduce-mother");
 await fewer("Full brothers", 1);
 await page.waitForTimeout(200);
-text = await page.textContent("main");
+text = await sharesText();
 check(text.includes("1/2") && !text.includes("7/12"), "with one brother the mother keeps a third of the remainder");
 await more("Full brothers", 1);
 await saved();
@@ -322,7 +325,7 @@ await next();
 check((await page.getByLabel(/husband's full name/i).inputValue()) === "Bilal Ahmed", "mirror will names the other spouse");
 await next();
 await expectStep("Your children");
-check((await page.textContent("main")).includes("1/4"), "mirror will recalculates the shares for a wife's estate (husband 1/4)");
+check((await sharesText()).includes("1/4"), "mirror will recalculates the shares for a wife's estate (husband 1/4)");
 await page.goto(`${BASE}/dashboard`);
 await shot("10-dashboard-premium");
 

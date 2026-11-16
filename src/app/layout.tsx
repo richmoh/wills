@@ -1,22 +1,34 @@
 import type { Metadata } from "next";
-import { Amiri, Fraunces, Inter } from "next/font/google";
+import { Amiri, Outfit, Schibsted_Grotesk, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+// The one typeface of the interface.
+const schibsted = Schibsted_Grotesk({
+  variable: "--font-schibsted",
   subsets: ["latin"],
 });
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// The logo only.
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
-  axes: ["opsz"],
 });
 
 const amiri = Amiri({
   variable: "--font-amiri",
   weight: ["400", "700"],
   subsets: ["arabic"],
+  preload: false,
+});
+
+// A book serif used only on the will itself, so the document looks like a
+// document. Not preloaded: most pages never show it.
+const sourceSerif = Source_Serif_4({
+  variable: "--font-source-serif",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  axes: ["opsz"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -43,9 +55,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${fraunces.variable} ${amiri.variable} h-full antialiased`}
+      className={`${schibsted.variable} ${outfit.variable} ${amiri.variable} ${sourceSerif.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  AuthField,
+  AuthHeading,
+  Dot,
+  authFoot,
+  authFootLink,
+  authStack,
+  authSubmit,
+} from "./AuthShell";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -39,103 +48,112 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     }
   };
 
+  const signup = mode === "signup";
+
   return (
-    <form onSubmit={submit} className="card mx-auto w-full max-w-md">
-      <h1 className="font-display text-2xl font-semibold text-forest-900">
-        {mode === "signup" ? "Create your account" : "Welcome back"}
-      </h1>
-      <p className="mt-1.5 text-sm text-ink/60">
-        {mode === "signup"
-          ? "Free to start — your will is saved securely as you go."
-          : "Sign in to continue your will."}
-      </p>
-      <div className="mt-6 space-y-4">
-        {mode === "signup" && (
-          <div>
-            <label className="label" htmlFor="fullName">Full name</label>
-            <input
-              id="fullName"
-              className="input"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              autoComplete="name"
-              required
-            />
-          </div>
-        )}
-        <div>
-          <label className="label" htmlFor="email">Email</label>
+    <form onSubmit={submit} className={authStack}>
+      {signup ? (
+        <AuthHeading title="Start your will">
+          Free, and no card needed. Your answers save as you go, so you can stop
+          and come back.
+        </AuthHeading>
+      ) : (
+        <AuthHeading title="Welcome back">Sign in to continue your will.</AuthHeading>
+      )}
+
+      {signup && (
+        <AuthField
+          id="fullName"
+          label="Your full name"
+          type="text"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          autoComplete="name"
+          required
+        />
+      )}
+      <AuthField
+        id="email"
+        label="Email address"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        autoComplete="email"
+        placeholder="you@example.com"
+        hint={
+          signup
+            ? "Check it carefully: this is how you get back in to update your will."
+            : undefined
+        }
+        required
+      />
+      <AuthField
+        id="password"
+        label={signup ? "Choose a password" : "Password"}
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        autoComplete={signup ? "new-password" : "current-password"}
+        minLength={signup ? 8 : undefined}
+        maxLength={200}
+        hint={signup ? "At least 8 characters." : undefined}
+        required
+      />
+
+      {signup && (
+        <label
+          htmlFor="consent"
+          className="flex items-start gap-[14px] rounded-[14px] border border-line bg-white p-4 text-[16px] leading-normal"
+        >
           <input
-            id="email"
-            type="email"
-            className="input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
+            id="consent"
+            type="checkbox"
+            className="mt-px h-6 w-6 flex-none accent-emerald"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
             required
           />
-        </div>
-        <div>
-          <label className="label" htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            className="input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            minLength={mode === "signup" ? 8 : undefined}
-            maxLength={200}
-            required
-          />
-          {mode === "login" && (
-            <p className="mt-2 text-right text-sm">
-              <Link href="/forgot-password" className="font-medium text-forest-800 hover:underline">
-                Forgot your password?
-              </Link>
-            </p>
-          )}
-        </div>
-        {mode === "signup" && (
-          <div className="flex items-start gap-3">
-            <input
-              id="consent"
-              type="checkbox"
-              className="mt-1 h-4 w-4 shrink-0 accent-forest-800"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              required
-            />
-            <label htmlFor="consent" className="text-sm leading-6 text-ink/75">
-              I understand Wasiyyah will store my answers — which reveal my
-              religion and details about my family — so it can prepare and keep
-              my will, and I consent to this. See the{" "}
-              <Link
-                href="/legal/privacy"
-                target="_blank"
-                className="font-semibold text-forest-800 underline"
-              >
-                privacy policy
-              </Link>
-              .
-            </label>
-          </div>
-        )}
-      </div>
+          <span>
+            I understand Wasiyyah will store my answers, which reveal my
+            religion and details about my family, so it can prepare and keep my
+            will. I consent to this.{" "}
+            <Link href="/legal/privacy" target="_blank" className="font-semibold">
+              Privacy policy
+            </Link>
+          </span>
+        </label>
+      )}
+
       {error && (
-        <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+        <p className="note-error text-[17px]" role="alert">
           {error}
         </p>
       )}
-      <button type="submit" disabled={busy} className="btn-primary mt-6 w-full">
-        {busy ? "One moment…" : mode === "signup" ? "Create account" : "Sign in"}
+
+      <button type="submit" disabled={busy} className={authSubmit}>
+        {busy ? "One moment…" : signup ? "Create my account and begin" : "Sign in"}
       </button>
-      <p className="mt-4 text-center text-sm text-ink/60">
-        {mode === "signup" ? (
-          <>Already have an account? <Link href="/login" className="font-semibold text-forest-800 hover:underline">Sign in</Link></>
+
+      <p className={authFoot}>
+        {signup ? (
+          <>
+            Already started?{" "}
+            <Link href="/login" className={`${authFootLink} font-bold`}>
+              Sign in
+            </Link>
+          </>
         ) : (
-          <>New here? <Link href="/signup" className="font-semibold text-forest-800 hover:underline">Create an account</Link></>
+          <>
+            New here?{" "}
+            <Link href="/signup" className={`${authFootLink} font-bold`}>
+              Create an account
+            </Link>
+          </>
         )}
+        <Dot />
+        <Link href="/forgot-password" className={`${authFootLink} font-semibold`}>
+          Forgot your password?
+        </Link>
       </p>
     </form>
   );

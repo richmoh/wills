@@ -2,7 +2,6 @@ import { redirect, notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { queryOne } from "@/lib/db";
 import { isUuid, normalizeWillData } from "@/lib/will-types";
-import { SiteHeader } from "@/components/SiteHeader";
 import { WillWizard } from "@/components/wizard/WillWizard";
 
 export const metadata = { title: "Your will interview" };
@@ -26,12 +25,7 @@ export default async function EditWillPage({
   // stored answers are normalised so older drafts survive schema growth
   const data = normalizeWillData(will.data);
 
-  return (
-    <>
-      <SiteHeader />
-      <main className="flex-1 pt-4">
-        <WillWizard willId={will.id} initialData={data} isPremium={user.is_premium} />
-      </main>
-    </>
-  );
+  // the interview draws its own header and its own <main>: the header shows
+  // the save state, and the review step lays the page out differently
+  return <WillWizard willId={will.id} initialData={data} isPremium={user.is_premium} />;
 }

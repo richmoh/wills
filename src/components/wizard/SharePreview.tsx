@@ -1,201 +1,346 @@
 "use client";
 
-import { useState } from "react";
 import type { FaraidResult, HeirGroupKey, HeirShare } from "@/lib/faraid/types";
-import { heirLabel } from "@/lib/faraid/labels";
+import { HEIR_LABELS, heirLabel } from "@/lib/faraid/labels";
+import { HEIR_ORDER, shareColours } from "@/lib/share-colours";
+import type { WillData } from "@/lib/will-types";
+import {
+  ShareBar,
+  ShareRing,
+  StackedFraction,
+  Swatch,
+  type ShareSegment,
+} from "@/components/Shares";
 
 /**
- * Validated categorical palette (dataviz six-checks, light surface).
- * Colors are assigned to heir groups in canonical family order — never by
- * share size — so a group keeps its color as answers change.
+ * The live picture of the shares, in the three places the interview shows it:
+ * the panel beside the questions, the summary above the buttons on a phone,
+ * and the list on the review step.
  */
-const CHART_COLORS = [
-  "#15804F", // green
-  "#B08A18", // gold
-  "#4678B8", // blue
-  "#B05F2A", // copper
-  "#6D5AC4", // violet
-  "#C1619C", // pink-plum
-];
-const OTHER_COLOR = "#7C8582";
 
-const CANONICAL_ORDER: HeirGroupKey[] = [
-  "husband", "wives", "sons", "daughters", "grandsons", "granddaughters",
-  "father", "mother", "paternalGrandfather", "grandmothers",
-  "fullBrothers", "fullSisters", "paternalBrothers", "paternalSisters",
-  "maternalSiblings", "otherAgnates", "distantKindred",
-];
-
-const BASIS_BADGE: Record<HeirShare["basis"], string> = {
-  "quranic-share": "Qur'anic share",
-  residuary: "Residuary",
-  "quranic-plus-residuary": "Share + residue",
-  radd: "Share + return",
-  "distant-kindred": "Distant kindred",
-  excluded: "Excluded",
-};
-
-interface Segment {
-  label: string;
-  fractionText: string;
-  percent: number;
-  color: string;
+interface Row extends ShareSegment {
+  heir: HeirShare;
+  /** "Maryam, your wife", or "Your 2 sons" when the will has no names for them */
+  title: string;
+  /** first names, when the will has one for everybody in the group */
+  names: string | null;
 }
 
-export function SharePreview({ result }: { result: FaraidResult }) {
-  const [hover, setHover] = useState<Segment | null>(null);
+const first = (full: string) => full.trim().split(/\s+/)[0];
 
-  if (result.noHeirs) {
-    return (
-      <div className="card">
-        <h3 className="font-display text-lg font-semibold text-forest-900">
-          Inheritance shares
-        </h3>
-        <p className="mt-3 text-sm leading-6 text-ink/70">
-          Based on your answers, no fara&rsquo;id heir survives you. Your will
-          directs the whole estate to the charity you choose, in the way of
-          Allah.
-        </p>
-      </div>
-    );
+const joined = (names: string[]) =>
+  names.length <= 1
+    ? (names[0] ?? "")
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+/** The names the will holds for a group, only if it has one for each person. */
+function knownNames(key: HeirGroupKey, count: number, d: WillData): string | null {
+  const from = (list: (string | undefined)[] | undefined) =>
+    (list ?? []).map((n) => (n ?? "").trim()).filter(Boolean);
+  let names: string[];
+  switch (key) {
+    case "husband":
+    case "wives":
+      names = from(d.spouseName.split(","));
+      break;
+    case "sons":
+      names = from(d.sonNames);
+      break;
+    case "daughters":
+      names = from(d.daughterNames);
+      break;
+    case "father":
+      names = from([d.fatherName]);
+      break;
+    case "mother":
+      names = from([d.motherName]);
+      break;
+    case "grandmothers":
+      names = [
+        ...(d.census.maternalGrandmother ? from(d.heirNames.maternalGrandmother) : []),
+        ...(d.census.paternalGrandmother ? from(d.heirNames.paternalGrandmother) : []),
+      ];
+      break;
+    case "otherAgnates":
+    case "distantKindred":
+      return null;
+    default:
+      names = from(d.heirNames[key]);
   }
+  return names.length === count && count <= 4 ? joined(names.map(first)) : null;
+}
 
-  const active = result.shares.filter((s) => !s.share.isZero());
-  const excluded = result.shares.filter((s) => s.share.isZero());
+const relation = (key: HeirGroupKey, count: number) =>
+  (count > 1 ? HEIR_LABELS[key].plural : HEIR_LABELS[key].singular).toLowerCase();
 
-  // color by canonical family order, stable across recalculations
-  const ordered = [...active].sort(
-    (a, b) => CANONICAL_ORDER.indexOf(a.key) - CANONICAL_ORDER.indexOf(b.key)
-  );
-  const colorFor = new Map<HeirGroupKey, string>();
-  ordered.forEach((s, i) => {
-    colorFor.set(s.key, i < CHART_COLORS.length ? CHART_COLORS[i] : OTHER_COLOR);
-  });
+function toRow(heir: HeirShare, d: WillData, fill: string, text: string): Row {
+  const names = knownNames(heir.key, heir.count, d);
+  const rel = relation(heir.key, heir.count);
+  return {
+    heir,
+    key: heir.key,
+    label: heirLabel(heir.key, heir.count),
+    n: heir.share.n,
+    d: heir.share.d,
+    fill,
+    text,
+    names,
+    title: names
+      ? `${names}, your ${rel}`
+      : `Your ${heir.count > 1 ? `${heir.count} ` : ""}${rel}`,
+  };
+}
 
-  const segments: Segment[] = ordered.map((s) => ({
-    label: heirLabel(s.key, s.count),
-    fractionText: s.share.toString(),
-    percent: s.share.toNumber() * 100,
-    color: colorFor.get(s.key)!,
-  }));
+function rowsFor(result: FaraidResult, d: WillData) {
+  const inOrder = (a: HeirShare, b: HeirShare) =>
+    HEIR_ORDER.indexOf(a.key) - HEIR_ORDER.indexOf(b.key);
+  const active = result.shares.filter((s) => !s.share.isZero()).sort(inOrder);
+  const colours = shareColours(active.map((s) => s.key));
+  return {
+    active: active.map((s) => {
+      const c = colours.get(s.key)!;
+      return toRow(s, d, c.fill, c.text);
+    }),
+    excluded: result.shares
+      .filter((s) => s.share.isZero())
+      .sort(inOrder)
+      .map((s) => toRow(s, d, "#B9C4BD", "#0F1F1A")),
+  };
+}
 
+function Adjustment({ result }: { result: FaraidResult }) {
+  if (!result.awlApplied && !result.raddApplied) return null;
+  // the engine returns the surplus to a spouse only when nobody else inherits
+  const spouse = result.shares.find((s) => s.key === "wives" || s.key === "husband");
+  const who = spouse ? (spouse.key === "wives" ? "wife" : "husband") : "";
+  const radd = !spouse
+    ? "No relative survives to take the remainder, so it returns to these heirs in proportion (radd)."
+    : spouse.basis === "radd"
+      ? `No other relative survives to take the remainder, so it returns to your ${who} (radd), the position of later Hanafi jurists.`
+      : `No relative survives to take the remainder, so it returns to the heirs other than your ${who}, in proportion (radd).`;
   return (
-    <div className="card">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-display text-lg font-semibold text-forest-900">
-          Inheritance shares
-        </h3>
-        <span className="text-xs text-ink/50">updates as you answer</span>
-      </div>
+    <p className="rounded-xl bg-saffron-tint px-4 py-3 text-[15px] leading-normal text-saffron-ink">
+      {result.awlApplied &&
+        "The fixed shares came to more than the whole estate, so each is reduced in proportion ('awl). "}
+      {result.raddApplied && radd}
+    </p>
+  );
+}
 
-      {/* proportional bar — 2px surface gaps between segments */}
-      <div
-        className="relative mt-4"
-        onMouseLeave={() => setHover(null)}
-      >
-        <div className="flex h-8 w-full gap-[2px] overflow-hidden rounded-lg">
-          {segments.map((seg) => (
-            <div
-              key={seg.label}
-              className="relative flex items-center justify-center transition-opacity"
-              style={{
-                width: `${seg.percent}%`,
-                backgroundColor: seg.color,
-                opacity: hover && hover.label !== seg.label ? 0.45 : 1,
-              }}
-              onMouseEnter={() => setHover(seg)}
-            >
-              {seg.percent >= 14 && (
-                <span className="truncate px-1.5 text-[11px] font-semibold text-white">
-                  {seg.fractionText}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-        {hover && (
-          <div className="pointer-events-none absolute -top-9 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-forest-950 px-3 py-1.5 text-xs font-medium text-white shadow-lg">
-            {hover.label}: {hover.fractionText} ({hover.percent.toFixed(1)}%)
-          </div>
-        )}
-      </div>
-
-      {/* the list is the table view: exact fractions, identity beside a chip */}
-      <ul className="mt-4 space-y-2.5">
-        {ordered.map((s) => (
-          <li key={s.key} className="flex items-start gap-2.5">
-            <span
-              className="mt-1 h-3 w-3 shrink-0 rounded-[4px]"
-              style={{ backgroundColor: colorFor.get(s.key) }}
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-sm font-semibold text-ink">
-                  {heirLabel(s.key, s.count)}
-                </span>
-                <span className="font-display text-sm font-semibold text-forest-800">
-                  {s.share.toString()}
-                </span>
-                <span className="text-xs tabular-nums text-ink/50">
-                  {s.share.toPercent(1)}
-                </span>
-                <span className="rounded-full bg-forest-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-forest-700">
-                  {BASIS_BADGE[s.basis]}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs leading-5 text-ink/55">{s.reason}</p>
-              {s.count > 1 && (
-                <p className="text-xs text-ink/45">
-                  {s.perPerson.toString()} each
-                </p>
-              )}
-            </div>
+function Working({ result, summary }: { result: FaraidResult; summary: string }) {
+  return (
+    <details>
+      <summary className="py-2.5 text-[16px] font-bold text-emerald">{summary}</summary>
+      <ol className="mt-1 flex flex-col gap-2 text-[15px] leading-normal text-ink-soft">
+        {result.trace.map((t, i) => (
+          <li key={i}>
+            <strong className="text-ink">{t.step}.</strong> {t.detail}
+            {t.source && <span> ({t.source})</span>}
           </li>
         ))}
-        {excluded.map((s, i) => (
-          <li key={`${s.key}-${i}`} className="flex items-start gap-2.5 opacity-60">
-            <span className="mt-1 h-3 w-3 shrink-0 rounded-[4px] border border-ink/25 bg-transparent" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-sm font-medium text-ink/70">
-                  {heirLabel(s.key, s.count)}
-                </span>
-                <span className="rounded-full bg-ink/5 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink/50">
-                  does not inherit
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs leading-5 text-ink/50">{s.reason}</p>
-            </div>
+      </ol>
+    </details>
+  );
+}
+
+/** Each heir with the reason for the share, then those who do not inherit. */
+function ShareList({ result, data }: { result: FaraidResult; data: WillData }) {
+  const { active, excluded } = rowsFor(result, data);
+  return (
+    <>
+      <ul className="flex flex-col gap-[18px]">
+        {active.map((r) => (
+          <li key={r.key} className="flex items-start gap-3.5">
+            <Swatch fill={r.fill} className="mt-[7px]" />
+            <span className="min-w-0 flex-1">
+              <strong>{r.title}</strong>
+              <span className="block text-[15px] leading-[1.45] text-ink-soft">
+                {r.heir.reason}
+                {r.heir.count > 1 && ` ${r.heir.perPerson.toString()} each.`}
+              </span>
+            </span>
+            <StackedFraction n={r.n} d={r.d} />
           </li>
         ))}
       </ul>
-
-      {(result.awlApplied || result.raddApplied) && (
-        <p className="mt-3 rounded-xl bg-gold-100 px-3 py-2 text-xs leading-5 text-ink/70">
-          {result.awlApplied &&
-            "The fixed shares exceeded the whole estate, so every share was scaled down proportionally ('awl). "}
-          {result.raddApplied &&
-            "No residuary heir survives, so the surplus returns pro-rata to the sharers (radd)."}
+      {excluded.map((r) => (
+        <p
+          key={r.key}
+          className="rounded-xl bg-stone px-4 py-3.5 text-[15px] leading-normal text-ink-soft"
+        >
+          <strong className="text-ink">
+            {r.title} {r.heir.count > 1 ? "do" : "does"} not inherit.
+          </strong>{" "}
+          {r.heir.reason}
         </p>
-      )}
+      ))}
+      <Adjustment result={result} />
+    </>
+  );
+}
 
-      <details className="group mt-4">
-        <summary className="cursor-pointer select-none text-sm font-semibold text-forest-800 hover:text-forest-600">
-          Show the rule-by-rule working
-        </summary>
-        <ol className="mt-3 space-y-2 border-l-2 border-forest-100 pl-4">
-          {result.trace.map((t, i) => (
-            <li key={i} className="text-xs leading-5 text-ink/70">
-              <span className="font-semibold text-forest-900">{t.step}.</span>{" "}
-              {t.detail}
-              {t.source && (
-                <span className="ml-1 text-ink/45">[{t.source}]</span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </details>
+/** Whether ShareBar has room to write "Wife 1/4" in this share's slice. */
+const barNames = (r: Row) =>
+  (Number(r.n) / Number(r.d)) * 330 >= `${r.label} ${r.n}/${r.d}`.length * 8 + 14;
+
+const NOTHING_YET =
+  "Your shares appear here as you tell us who is in your family.";
+const NO_HEIRS =
+  "Based on your answers, no fara'id heir survives you. Your will directs the whole estate to the charity you choose, in the way of Allah.";
+
+/** The card beside the questions: ring, reasons, and the working on request. */
+export function SharesPanel({
+  result,
+  data,
+  familyAnswered,
+}: {
+  result: FaraidResult | null;
+  data: WillData;
+  /** false while the family questions are still being answered */
+  familyAnswered: boolean;
+}) {
+  const rows = result && !result.noHeirs ? rowsFor(result, data) : null;
+  return (
+    <div className="rounded-3xl border border-line bg-white p-[clamp(24px,2.4vw,32px)]">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h2 className="h-card">Your shares so far</h2>
+        <span className="text-[14px] text-ink-soft">Updates as you answer</span>
+      </div>
+      {!result || !rows ? (
+        <p className="mt-4 text-[16px] text-ink-soft">
+          {result && familyAnswered ? NO_HEIRS : NOTHING_YET}
+        </p>
+      ) : (
+        <>
+          <div className="my-6 flex justify-center">
+            <ShareRing segments={rows.active} size={200} />
+          </div>
+          <div className="flex flex-col gap-5">
+            <ShareList result={result} data={data} />
+            <Working result={result} summary="Show the full working, with sources" />
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * The phone's summary: one bar and one line, with the full list a tap away.
+ * Returns null when there is nothing to show yet.
+ */
+export function SharesSummary({
+  result,
+  data,
+  open,
+  onToggle,
+  panelId,
+}: {
+  result: FaraidResult | null;
+  data: WillData;
+  open: boolean;
+  onToggle: () => void;
+  panelId: string;
+}) {
+  if (!result || result.noHeirs) return null;
+  const { active, excluded } = rowsFor(result, data);
+  // the bar names the shares it has room for; this line carries the rest
+  const small = active
+    .filter((r) => !barNames(r))
+    .map((r) => `${r.label} ${r.n}/${r.d}`);
+  const out = excluded.map(
+    (r) => `${r.title.replace(/^Your/, "your")} ${r.heir.count > 1 ? "do" : "does"} not inherit`
+  );
+  const line = [...small, ...out].join(" · ");
+  return (
+    <>
+      {open && (
+        <div id={panelId} className="flex max-h-[50vh] flex-col gap-4 overflow-y-auto pb-1">
+          <ShareList result={result} data={data} />
+          <Working result={result} summary="Show the full working, with sources" />
+        </div>
+      )}
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={onToggle}
+        className="flex flex-col gap-2 text-left"
+      >
+        <span className="flex items-center justify-between text-[15px]">
+          <strong>Your shares so far</strong>
+          <span className="flex items-center gap-1 font-bold text-emerald">
+            {open ? "Hide" : "See why"}
+            <svg
+              aria-hidden="true"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={open ? "rotate-180" : ""}
+            >
+              <path d="M6 15l6-6 6 6" />
+            </svg>
+          </span>
+        </span>
+        <ShareBar segments={active} className="h-9 rounded-[9px] text-[14px]" showLabel width={330} />
+        {line && !open && <span className="text-[14px] text-ink-soft">{line}</span>}
+      </button>
+    </>
+  );
+}
+
+/** The review step's list: who gets what, as it will be written into the will. */
+export function ReviewShares({ result, data }: { result: FaraidResult | null; data: WillData }) {
+  if (!result) return null;
+  const rows = result.noHeirs ? null : rowsFor(result, data);
+  return (
+    <section className="rounded-[20px] border border-line bg-white px-[clamp(20px,2.4vw,32px)] py-7">
+      <h2 className="h-card mb-4">The shares in your will</h2>
+      {!rows ? (
+        <p className="text-[16px] text-ink-soft">{NO_HEIRS}</p>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-4">
+            {rows.active.map((r) => {
+              const group = heirLabel(r.key as HeirGroupKey, 1);
+              const size =
+                r.heir.count > 1
+                  ? `${r.heir.perPerson.toString()} each`
+                  : r.heir.share.toPercent(1);
+              return (
+                <li key={r.key} className="flex items-center gap-3.5">
+                  <Swatch fill={r.fill} />
+                  <span className="min-w-0 flex-1">
+                    <strong>{r.names ?? r.label}</strong>
+                    <span className="block text-[15px] text-ink-soft">
+                      {r.names
+                        ? `${r.heir.count > 1 ? HEIR_LABELS[r.heir.key].plural : group} · ${size}`
+                        : size}
+                    </span>
+                  </span>
+                  <StackedFraction n={r.n} d={r.d} className="min-w-[44px] text-[20px]" />
+                </li>
+              );
+            })}
+          </ul>
+          {rows.excluded.length > 0 && (
+            <p className="mt-4 text-[15px] leading-normal text-ink-soft">
+              Not inheriting:{" "}
+              {rows.excluded.map((r) => r.title.replace(/^Your/, "your")).join("; ")}. The
+              working below gives the reason for each.
+            </p>
+          )}
+          <div className="mt-4 flex flex-col gap-3">
+            <Adjustment result={result} />
+            <Working result={result} summary="See the working, with sources" />
+          </div>
+        </>
+      )}
+    </section>
   );
 }

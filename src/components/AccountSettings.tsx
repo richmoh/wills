@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const row =
+  "flex flex-wrap justify-between gap-x-6 gap-y-0.5 border-t border-line py-3.5 first:border-t-0 first:pt-0 last:pb-0";
+
 export function AccountSettings({
   fullName,
   email,
@@ -13,21 +16,21 @@ export function AccountSettings({
   isPremium: boolean;
 }) {
   return (
-    <div className="mt-8 space-y-4">
+    <div className="flex max-w-[760px] flex-col gap-7">
       <section className="card">
-        <h2 className="font-display text-lg font-semibold text-forest-900">Your details</h2>
-        <dl className="mt-4 space-y-3 text-sm">
-          <div className="flex flex-wrap justify-between gap-x-6 gap-y-1">
-            <dt className="text-ink/55">Name</dt>
-            <dd className="font-medium text-ink">{fullName}</dd>
+        <h2 className="h-card">Your details</h2>
+        <dl className="mt-5">
+          <div className={row}>
+            <dt className="text-ink-soft">Name</dt>
+            <dd className="min-w-0 font-semibold break-words">{fullName}</dd>
           </div>
-          <div className="flex flex-wrap justify-between gap-x-6 gap-y-1">
-            <dt className="text-ink/55">Email</dt>
-            <dd className="font-medium text-ink">{email}</dd>
+          <div className={row}>
+            <dt className="text-ink-soft">Email</dt>
+            <dd className="min-w-0 font-semibold break-words">{email}</dd>
           </div>
-          <div className="flex flex-wrap justify-between gap-x-6 gap-y-1">
-            <dt className="text-ink/55">Plan</dt>
-            <dd className="font-medium text-ink">
+          <div className={row}>
+            <dt className="text-ink-soft">Plan</dt>
+            <dd className="min-w-0 font-semibold">
               {isPremium ? "Complete Will Pack — lifetime access" : "Free — one Essential Will"}
             </dd>
           </div>
@@ -35,12 +38,12 @@ export function AccountSettings({
       </section>
 
       <section className="card">
-        <h2 className="font-display text-lg font-semibold text-forest-900">Your data</h2>
-        <p className="mt-2 text-sm leading-6 text-ink/65">
+        <h2 className="h-card">Your data</h2>
+        <p className="mt-2 text-ink-soft">
           Download a copy of your account details, the answers in each of
           your wills, and your payment records, as a single file.
         </p>
-        <a href="/api/account/export" className="btn-ghost mt-4 !py-2.5">
+        <a href="/api/account/export" className="btn-ghost mt-5">
           Download my data
         </a>
       </section>
@@ -88,9 +91,9 @@ function DeleteAccount() {
   };
 
   return (
-    <section className="card border-red-200">
-      <h2 className="font-display text-lg font-semibold text-forest-900">Delete your account</h2>
-      <p className="mt-2 text-sm leading-6 text-ink/65">
+    <section className="card border-clay">
+      <h2 className="h-card">Delete your account</h2>
+      <p className="mt-2 text-ink-soft">
         This permanently deletes your account, every will and document in it,
         and your payment records. It cannot be undone, and a paid Complete
         Will Pack does not carry over to a new account. A will you have
@@ -101,44 +104,42 @@ function DeleteAccount() {
         <button
           id="delete-account-start"
           type="button"
-          className="mt-4 text-sm font-semibold text-red-700 hover:underline"
+          className="btn-ghost mt-5 border-clay text-clay hover:border-clay hover:bg-clay hover:text-white"
           onClick={() => setConfirming(true)}
         >
           Delete my account
         </button>
       ) : (
-        <form onSubmit={submit} className="mt-5 border-t border-ink/8 pt-5">
+        <form onSubmit={submit} className="mt-6 border-t border-line pt-6">
           <label className="label" htmlFor="delete-password">
             Enter your password to confirm
           </label>
+          {/* focus moves here from the button this form replaces */}
           <input
             id="delete-password"
             type="password"
-            className="input"
+            className="input max-w-[440px]"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             maxLength={200}
             required
+            autoFocus
           />
           {error && (
-            <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+            <p className="note-error mt-4" role="alert">
               {error}
             </p>
           )}
-          <div className="mt-5 flex flex-wrap items-center gap-4">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex items-center justify-center rounded-full bg-red-700 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50"
+              className="btn-dark bg-clay enabled:hover:bg-ink disabled:bg-stone"
             >
               {busy ? "Deleting…" : "Delete my account permanently"}
             </button>
-            <button
-              type="button"
-              className="text-sm font-medium text-ink/55 hover:text-forest-800"
-              onClick={cancel}
-            >
+            <button type="button" className="btn-ghost" onClick={cancel}>
               Keep my account
             </button>
           </div>

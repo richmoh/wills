@@ -3,10 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  AuthField,
+  AuthHeading,
+  authFoot,
+  authFootLink,
+  authStack,
+  authSubmit,
+} from "./AuthShell";
 
-const errorBox =
-  "mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800";
-const textLink = "font-semibold text-forest-800 hover:underline";
+const errorBox = "note-error text-[17px]";
+const footLink = `${authFootLink} font-bold`;
 
 /** Step one: ask for the email address and send a reset link to it. */
 export function ForgotPasswordForm() {
@@ -43,61 +50,63 @@ export function ForgotPasswordForm() {
 
   if (sent) {
     return (
-      <div className="card mx-auto w-full max-w-md" role="status">
-        <h1 className="font-display text-2xl font-semibold text-forest-900">
-          Check your email
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-ink/70">
-          If there is a Wasiyyah account for <strong>{email}</strong>, we have
+      <div className={authStack} role="status">
+        <AuthHeading title="Check your email">
+          If there is a Wasiyyah account for{" "}
+          <strong className="text-ink [overflow-wrap:anywhere]">{email}</strong>, we have
           sent it a link to choose a new password. The link works once and
           expires in one hour.
-        </p>
-        <p className="mt-3 text-sm leading-6 text-ink/70">
+        </AuthHeading>
+        <p className="text-ink-soft">
           Nothing arrived? Check your spam folder, or email
           support@themuslimguide.org.
         </p>
         {devResetUrl && (
-          <p className="mt-4 rounded-xl border border-gold-300 bg-gold-100/70 px-4 py-3 text-sm text-ink/80">
-            Development only — no email was sent.{" "}
-            <a id="dev-reset-link" href={devResetUrl} className={textLink}>
+          <p className="note-warn text-[16px]">
+            Development only: no email was sent.{" "}
+            <a id="dev-reset-link" href={devResetUrl} className="font-bold">
               Open the reset link
             </a>
           </p>
         )}
-        <p className="mt-6 text-center text-sm text-ink/60">
-          <Link href="/login" className={textLink}>Back to sign in</Link>
+        <p className={authFoot}>
+          <Link href="/login" className={footLink}>
+            Back to sign in
+          </Link>
         </p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit} className="card mx-auto w-full max-w-md">
-      <h1 className="font-display text-2xl font-semibold text-forest-900">
-        Reset your password
-      </h1>
-      <p className="mt-1.5 text-sm text-ink/60">
+    <form onSubmit={submit} className={authStack}>
+      <AuthHeading title="Reset your password">
         Enter the email you signed up with and we will send you a link to
         choose a new password.
-      </p>
-      <div className="mt-6">
-        <label className="label" htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          className="input"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          required
-        />
-      </div>
-      {error && <p className={errorBox} role="alert">{error}</p>}
-      <button type="submit" disabled={busy} className="btn-primary mt-6 w-full">
+      </AuthHeading>
+      <AuthField
+        id="email"
+        label="Email address"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        autoComplete="email"
+        placeholder="you@example.com"
+        required
+      />
+      {error && (
+        <p className={errorBox} role="alert">
+          {error}
+        </p>
+      )}
+      <button type="submit" disabled={busy} className={authSubmit}>
         {busy ? "One moment…" : "Send reset link"}
       </button>
-      <p className="mt-4 text-center text-sm text-ink/60">
-        Remembered it? <Link href="/login" className={textLink}>Sign in</Link>
+      <p className={authFoot}>
+        Remembered it?{" "}
+        <Link href="/login" className={footLink}>
+          Sign in
+        </Link>
       </p>
     </form>
   );
@@ -139,15 +148,12 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
   if (!token) {
     return (
-      <div className="card mx-auto w-full max-w-md">
-        <h1 className="font-display text-2xl font-semibold text-forest-900">
-          This link is incomplete
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-ink/70">
+      <div className={authStack}>
+        <AuthHeading title="This link is incomplete">
           Open the link from your password reset email again, or ask for a new
           one.
-        </p>
-        <Link href="/forgot-password" className="btn-primary mt-6 w-full">
+        </AuthHeading>
+        <Link href="/forgot-password" className={authSubmit}>
           Send a new reset link
         </Link>
       </div>
@@ -155,43 +161,37 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="card mx-auto w-full max-w-md">
-      <h1 className="font-display text-2xl font-semibold text-forest-900">
-        Choose a new password
-      </h1>
-      <p className="mt-1.5 text-sm text-ink/60">
+    <form onSubmit={submit} className={authStack}>
+      <AuthHeading title="Choose a new password">
         Once it is saved you will be signed in here, and signed out everywhere
         else.
-      </p>
-      <div className="mt-6">
-        <label className="label" htmlFor="password">New password</label>
-        <input
-          id="password"
-          type="password"
-          className="input"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="new-password"
-          minLength={8}
-          maxLength={200}
-          required
-        />
-        <p className="mt-1.5 text-xs text-ink/50">At least 8 characters.</p>
-      </div>
+      </AuthHeading>
+      <AuthField
+        id="password"
+        label="New password"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        autoComplete="new-password"
+        minLength={8}
+        maxLength={200}
+        hint="At least 8 characters."
+        required
+      />
       {error && (
         <p className={errorBox} role="alert">
           {error}
           {linkRefused && (
             <>
               {" "}
-              <Link href="/forgot-password" className="font-semibold underline">
+              <Link href="/forgot-password" className="font-bold">
                 Send a new reset link
               </Link>
             </>
           )}
         </p>
       )}
-      <button type="submit" disabled={busy} className="btn-primary mt-6 w-full">
+      <button type="submit" disabled={busy} className={authSubmit}>
         {busy ? "One moment…" : "Save new password"}
       </button>
     </form>

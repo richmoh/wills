@@ -1,49 +1,48 @@
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import { Logo } from "./Logo";
+import { NavLink } from "./NavLink";
 
+/** The header of the public site: home, pricing, questions, legal, sign-in. */
 export async function SiteHeader() {
   const user = await getSessionUser();
   return (
-    <header className="sticky top-0 z-40 border-b border-ink/8 bg-paper/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" aria-label="Wasiyyah home">
-          <Logo />
-        </Link>
-        <nav className="hidden items-center gap-7 text-sm font-medium text-ink/70 md:flex">
-          <Link href="/#how-it-works" className="hover:text-forest-800">
-            How it works
+    <header className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-x-8 gap-y-4 px-[clamp(20px,4vw,48px)] py-5">
+      <Link href="/" aria-label="Wasiyyah, Islamic Wills" className="no-underline">
+        <Logo />
+      </Link>
+      <nav
+        aria-label="Main"
+        className="flex flex-wrap items-center gap-x-7 gap-y-2 text-[16px] font-medium"
+      >
+        {/* the two in-page links are dropped on a phone, where space is short */}
+        <NavLink href="/#how" className="hidden py-2.5 md:inline">
+          How it works
+        </NavLink>
+        <NavLink href="/#working" className="hidden py-2.5 md:inline">
+          The shares
+        </NavLink>
+        <NavLink href="/pricing" className="py-2.5">
+          Pricing
+        </NavLink>
+        <NavLink href="/faq" className="py-2.5">
+          Questions
+        </NavLink>
+        {user ? (
+          <Link href="/dashboard" className="btn-primary !py-3">
+            My wills
           </Link>
-          <Link href="/#inheritance" className="hover:text-forest-800">
-            Islamic inheritance
-          </Link>
-          <Link href="/pricing" className="hover:text-forest-800">
-            Pricing
-          </Link>
-          <Link href="/faq" className="hover:text-forest-800">
-            FAQ
-          </Link>
-        </nav>
-        <div className="flex items-center gap-3">
-          {user ? (
-            <Link href="/dashboard" className="btn-primary !py-2.5">
-              My wills
+        ) : (
+          <>
+            <NavLink href="/login" strong className="py-2.5">
+              Sign in
+            </NavLink>
+            <Link href="/signup" className="btn-primary !py-3">
+              Start my will
             </Link>
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className="text-sm font-semibold text-forest-900 hover:text-forest-700"
-              >
-                Sign in
-              </Link>
-              <Link href="/signup" className="btn-primary !py-2.5">
-                Start my will
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
+          </>
+        )}
+      </nav>
     </header>
   );
 }
