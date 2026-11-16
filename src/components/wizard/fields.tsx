@@ -50,7 +50,7 @@ export function CountField({
   hint?: string;
 }) {
   return (
-    <div>
+    <div role="group" aria-label={label}>
       <span className="label">
         {label}
         {hint && <span className="ml-1 font-normal text-ink/45">— {hint}</span>}
@@ -65,7 +65,7 @@ export function CountField({
         >
           −
         </button>
-        <span className="w-10 text-center text-base font-semibold tabular-nums">
+        <span className="w-10 text-center text-base font-semibold tabular-nums" aria-live="polite">
           {value}
         </span>
         <button
@@ -94,7 +94,7 @@ export function YesNo({
   hint?: string;
 }) {
   return (
-    <div>
+    <div role="group" aria-label={label}>
       <span className="label">
         {label}
         {hint && <span className="ml-1 font-normal text-ink/45">— {hint}</span>}
@@ -107,6 +107,7 @@ export function YesNo({
           <button
             key={t}
             type="button"
+            aria-pressed={value === v}
             onClick={() => onChange(v)}
             className={`rounded-xl border px-6 py-2.5 text-sm font-semibold transition ${
               value === v
@@ -136,7 +137,7 @@ export function ChoiceField<T extends string>({
   hint?: string;
 }) {
   return (
-    <div>
+    <div role="group" aria-label={label}>
       <span className="label">
         {label}
         {hint && <span className="ml-1 font-normal text-ink/45">— {hint}</span>}
@@ -146,6 +147,7 @@ export function ChoiceField<T extends string>({
           <button
             key={o.value}
             type="button"
+            aria-pressed={value === o.value}
             onClick={() => onChange(o.value)}
             className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
               value === o.value
@@ -248,7 +250,8 @@ export function NameList({
             key={i}
             className="input"
             value={n}
-            placeholder={`Name ${i + 1}`}
+            aria-label={`${label} ${i + 1}`}
+            placeholder={count > 1 ? `Name ${i + 1}` : "Full name"}
             onChange={(e) => {
               const next = [...padded];
               next[i] = e.target.value;

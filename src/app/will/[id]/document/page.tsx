@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { queryOne } from "@/lib/db";
 import { buildWillDocument } from "@/lib/document";
-import { emptyCensus } from "@/lib/faraid/types";
-import { emptyWillData, type WillData } from "@/lib/will-types";
+import { firstIncompleteStep } from "@/lib/interview";
+import { isUuid, normalizeWillData } from "@/lib/will-types";
 import { PrintButton } from "@/components/PrintButton";
 import { UpgradeButton } from "@/components/DashboardActions";
 import { Logo } from "@/components/Logo";
@@ -20,23 +20,22 @@ export default async function WillDocumentPage({
   if (!user) redirect("/login");
 
   const { id } = await params;
-  const row = await queryOne<{ id: string; data: Partial<WillData>; status: string }>(
-    `select id, data, status from wills where id = $1 and user_id = $2`,
+  if (!isUuid(id)) notFound();
+  const row = await queryOne<{ id: string; data: unknown; status: string; updated_at: string }>(
+    `select id, data, status, updated_at from wills where id = $1 and user_id = $2`,
     [id, user.id]
   );
   if (!row) notFound();
 
-  const defaults = emptyWillData();
-  const data: WillData = {
-    ...defaults,
-    ...row.data,
-    census: { ...emptyCensus(), ...(row.data.census ?? {}) },
-    religiousDebts: { ...defaults.religiousDebts, ...(row.data.religiousDebts ?? {}) },
-    complexity: { ...defaults.complexity, ...(row.data.complexity ?? {}) },
-  };
+  const data = normalizeWillData(row.data);
+  // a will is only shown once it has been generated from a complete set of answers
+  if (row.status !== "complete" || firstIncompleteStep(data, user.is_premium)) {
+    redirect(`/will/${row.id}/edit`);
+  }
 
   const doc = buildWillDocument(data, user.is_premium);
-  const today = new Date().toLocaleDateString("en-GB", {
+  // the date the will was generated — it must not change each time the page is opened
+  const generatedOn = new Date(row.updated_at).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -63,7 +62,7 @@ export default async function WillDocumentPage({
         {!user.is_premium && (
           <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gold-300/60 bg-gold-100/50 p-5">
             <p className="max-w-xl text-sm leading-6 text-ink/75">
-              <strong>This is your free Essential Will — valid and complete.</strong>{" "}
+              <strong>This is your free Essential Will — complete and ready to sign.</strong>{" "}
               The Complete Will Pack adds charitable bequests, the
               religious-debts schedule, a letter of wishes, executor guidance
               and the estate checklist, plus a mirror will for your spouse.
@@ -182,9 +181,11 @@ export default async function WillDocumentPage({
             </section>
           </div>
 
-          <footer className="mt-12 border-t border-ink/10 pt-4 text-center text-[11px] text-ink/40">
-            Prepared with Wasiyyah ({user.is_premium ? "Complete Will Pack" : "free plan"}) on {today} ·
-            wills.themuslimguide.org · This document was prepared from the testator&rsquo;s own instructions.
+          <footer className="will-footer mt-12 border-t border-ink/10 pt-4 text-center text-[11px] text-ink/40">
+            Prepared with Wasiyyah ({user.is_premium ? "Complete Will Pack" : "free plan"}) on {generatedOn} ·
+            reference {doc.reference} · wills.themuslimguide.org · This
+            document was prepared from the testator&rsquo;s own instructions. The
+            testator and both witnesses should initial the foot of every page.
           </footer>
         </article>
 

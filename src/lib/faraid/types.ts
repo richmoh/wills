@@ -31,6 +31,12 @@ export interface HeirCensus {
   maternalSiblings: number;
   /** any remoter male-line relative: nephew, paternal uncle, male cousin */
   hasOtherAgnates: boolean;
+  /**
+   * any other blood relative (dhawu al-arham): daughters' children, sisters'
+   * children, aunts, maternal uncles. They inherit only when there is no
+   * fixed-share heir other than a spouse and no residuary heir.
+   */
+  hasDistantKindred: boolean;
 }
 
 export const emptyCensus = (
@@ -53,6 +59,7 @@ export const emptyCensus = (
   paternalSisters: 0,
   maternalSiblings: 0,
   hasOtherAgnates: false,
+  hasDistantKindred: false,
 });
 
 export type HeirGroupKey =
@@ -71,13 +78,15 @@ export type HeirGroupKey =
   | "paternalBrothers"
   | "paternalSisters"
   | "maternalSiblings"
-  | "otherAgnates";
+  | "otherAgnates"
+  | "distantKindred";
 
 export type ShareBasis =
   | "quranic-share" // fixed fardh from Qur'an 4:11, 4:12, 4:176
   | "residuary" // 'asaba
   | "quranic-plus-residuary" // e.g. father's 1/6 + remainder
   | "radd" // fixed share increased by return of surplus
+  | "distant-kindred" // dhawu al-arham, in the absence of sharers and residuaries
   | "excluded"; // present but excluded (hajb) — shown with zero share
 
 export interface HeirShare {

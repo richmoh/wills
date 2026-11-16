@@ -32,9 +32,10 @@ export default function LandingPage() {
                   <span className="text-gold-300">done properly.</span>
                 </h1>
                 <p className="mt-6 max-w-lg text-lg leading-8 text-white/75">
-                  A professionally drafted will that follows the Qur&rsquo;anic
-                  shares <em>exactly</em> and is valid under English law —
-                  from a guided interview that takes about 15 minutes.
+                  A clearly drafted will that follows the Qur&rsquo;anic
+                  shares <em>exactly</em> and is written for the law of
+                  England &amp; Wales — from a guided interview that takes
+                  about 15 minutes.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center gap-4">
                   <Link href="/signup" className="btn-gold !px-8 !py-3.5 !text-base">
@@ -52,10 +53,10 @@ export default function LandingPage() {
                     <Tick /> Exact fara&rsquo;id shares
                   </li>
                   <li className="flex items-center gap-2">
-                    <Tick /> Wills Act 1837 compliant
+                    <Tick /> Signing steps for the Wills Act 1837
                   </li>
                   <li className="flex items-center gap-2">
-                    <Tick /> Free will, genuinely valid
+                    <Tick /> A complete will, free
                   </li>
                 </ul>
               </div>
@@ -178,7 +179,7 @@ export default function LandingPage() {
                 {
                   n: "٣",
                   title: "Print, sign, done",
-                  body: "Your will is drafted for England & Wales with step-by-step signing instructions. Two witnesses, ten minutes, and your wasiyyah is legally binding.",
+                  body: "Your will is drafted for England & Wales with step-by-step signing instructions. Sign it with two independent witnesses, exactly as the instructions describe, and your wasiyyah takes legal effect.",
                 },
               ].map((s) => (
                 <div key={s.title}>
@@ -251,8 +252,8 @@ export default function LandingPage() {
                 Free for every Muslim. More for those who want it.
               </h2>
               <p className="mt-4 text-white/70">
-                The Essential Will is complete and legally valid — free, because
-                no one should be without a wasiyyah. The Complete Will Pack is a
+                The Essential Will is a complete will, ready to sign — free,
+                because no one should be without a wasiyyah. The Complete Will Pack is a
                 single payment, never a subscription.
               </p>
             </div>
@@ -306,12 +307,12 @@ export default function LandingPage() {
           <div className="mt-10 space-y-4">
             {[
               {
-                q: "Is this will really legally valid?",
-                a: "Yes. England & Wales grants near-total testamentary freedom, so a will distributing your estate in the Qur'anic shares is enforced like any other — provided it is signed with two independent witnesses exactly as our instructions describe. For complex estates (businesses, foreign property, expected disputes) we flag when a solicitor should review it.",
+                q: "Will my will be legally valid?",
+                a: "A will takes effect in England & Wales when an adult with capacity signs it in front of two independent witnesses, who then sign it too. English law lets you leave your estate as you wish, so a will in the Qur'anic shares is treated like any other. Ours is drafted to meet those requirements and comes with exact signing instructions — but Wasiyyah is a self-help service, not a law firm, and its wording has not yet been reviewed by a solicitor. For anything beyond a straightforward estate we tell you when to ask one.",
               },
               {
                 q: "Which school of fiqh do you follow?",
-                a: "The rules the four Sunni schools agree on — which is almost everything — plus the Hanafi position on the few points of difference. Every rule applied to your family is shown in the working, so you can take it to your own scholar.",
+                a: "The rules the four Sunni schools agree on — which is almost everything — plus the Hanafi position on the few points of difference. Every rule applied to your family is shown in the working, so you can take it to your own imam or scholar; the calculation has not yet had an independent scholarly review, and we would rather show our working than ask for your trust.",
               },
               {
                 q: "What happens when my family changes?",

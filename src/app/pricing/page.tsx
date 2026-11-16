@@ -7,7 +7,7 @@ import { UpgradeButton } from "@/components/DashboardActions";
 export const metadata = {
   title: "Pricing",
   description:
-    "The Essential Will is free and legally valid. The Complete Will Pack is a one-time £39 — never a subscription.",
+    "The Essential Will is free and complete. The Complete Will Pack is a one-time £39 — never a subscription.",
 };
 
 const rows: [string, boolean, boolean][] = [
@@ -17,12 +17,12 @@ const rows: [string, boolean, boolean][] = [
   ["Islamic burial directions", true, true],
   ["England & Wales signing instructions", true, true],
   ["Print-ready will document", true, true],
-  ["Charitable bequests / wasiyya (one-third cap enforced)", false, true],
+  ["Charitable bequests / wasiyya (kept within one-third)", false, true],
   ["Religious-debts schedule (zakat, fidya, kaffarah, Hajj)", false, true],
   ["Letter of wishes", false, true],
   ["Executor guidance pack", false, true],
   ["Estate-alignment checklist (joint homes, pensions, insurance)", false, true],
-  ["Mirror will for your spouse", false, true],
+  ["Mirror will for your spouse, pre-filled from yours", false, true],
   ["Unlimited wills & future updates", false, true],
 ];
 
@@ -44,7 +44,7 @@ export default async function PricingPage({
               One honest price. No subscription.
             </h1>
             <p className="mt-4 text-ink/65">
-              Your Essential Will is free — complete and legally valid. The
+              Your Essential Will is free — a complete will, ready to sign. The
               Complete Will Pack is a single payment of{" "}
               <strong>£39</strong>, yours for life.
             </p>

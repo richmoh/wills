@@ -203,6 +203,110 @@ describe("fara'id engine — classical golden cases", () => {
     expect(shareOf(r, "wives").eq(frac(1, 4))).toBe(true);
     expect(shareOf(r, "otherAgnates").eq(frac(3, 4))).toBe(true);
   });
+
+  it("distant kindred take the remainder beside a spouse — the spouse is not given it by radd", () => {
+    const r = calculateFaraid(census({ testatorSex: "female", spouseCount: 1, hasDistantKindred: true }));
+    expect(shareOf(r, "husband").eq(frac(1, 2))).toBe(true);
+    expect(shareOf(r, "distantKindred").eq(frac(1, 2))).toBe(true);
+    expect(r.raddApplied).toBe(false);
+  });
+
+  it("distant kindred take the whole estate when no one else survives", () => {
+    const r = calculateFaraid(census({ hasDistantKindred: true }));
+    expect(r.noHeirs).toBe(false);
+    expect(shareOf(r, "distantKindred").eq(frac(1))).toBe(true);
+  });
+
+  it("radd to a sharer comes before distant kindred", () => {
+    const r = calculateFaraid(census({ spouseCount: 1, mother: true, hasDistantKindred: true }));
+    expect(shareOf(r, "wives").eq(frac(1, 4))).toBe(true);
+    expect(shareOf(r, "mother").eq(frac(3, 4))).toBe(true);
+    expect(r.shares.find((s) => s.key === "distantKindred")?.basis).toBe("excluded");
+  });
+
+  it("male-line relatives come before distant kindred", () => {
+    const r = calculateFaraid(census({ hasOtherAgnates: true, hasDistantKindred: true }));
+    expect(shareOf(r, "otherAgnates").eq(frac(1))).toBe(true);
+    expect(shareOf(r, "distantKindred").isZero()).toBe(true);
+  });
+
+  it("lists excluded brothers and sisters separately", () => {
+    const r = calculateFaraid(
+      census({ sons: 1, fullBrothers: 1, fullSisters: 2, paternalBrothers: 1, paternalSisters: 1 })
+    );
+    for (const k of ["fullBrothers", "fullSisters", "paternalBrothers", "paternalSisters"]) {
+      expect(r.shares.find((s) => s.key === k)?.basis).toBe("excluded");
+    }
+  });
+
+  it("a full sister made residuary by a daughter excludes paternal half-siblings", () => {
+    const r = calculateFaraid(census({ daughters: 1, fullSisters: 1, paternalBrothers: 1 }));
+    expect(shareOf(r, "fullSisters").eq(frac(1, 2))).toBe(true);
+    const half = r.shares.find((s) => s.key === "paternalBrothers");
+    expect(half?.basis).toBe("excluded");
+    expect(half?.reason).toMatch(/full sister/);
+  });
+
+  it("residuary heirs left with nothing are shown with the reason", () => {
+    // husband 1/4, two daughters 2/3, mother 1/6, father 1/6 → 'awl; nothing for the son's son
+    const r = calculateFaraid(
+      census({ testatorSex: "female", spouseCount: 1, daughters: 2, mother: true, father: true, grandsons: 1 })
+    );
+    expect(r.awlApplied).toBe(true);
+    const g = r.shares.find((s) => s.key === "grandsons");
+    expect(g?.basis).toBe("excluded");
+    expect(g?.reason).toMatch(/fixed shares use up/);
+  });
+
+  it("husband + mother + father + daughter: 'awl 12→13", () => {
+    const r = calculateFaraid(
+      census({ testatorSex: "female", spouseCount: 1, mother: true, father: true, daughters: 1 })
+    );
+    expect(shareOf(r, "husband").eq(frac(3, 13))).toBe(true);
+    expect(shareOf(r, "daughters").eq(frac(6, 13))).toBe(true);
+    expect(shareOf(r, "mother").eq(frac(2, 13))).toBe(true);
+    expect(shareOf(r, "father").eq(frac(2, 13))).toBe(true);
+  });
+
+  it("daughter + son's daughter + full sister: 1/2, 1/6, remainder", () => {
+    const r = calculateFaraid(census({ daughters: 1, granddaughters: 1, fullSisters: 1 }));
+    expect(shareOf(r, "daughters").eq(frac(1, 2))).toBe(true);
+    expect(shareOf(r, "granddaughters").eq(frac(1, 6))).toBe(true);
+    expect(shareOf(r, "fullSisters").eq(frac(1, 3))).toBe(true);
+  });
+
+  it("two full sisters + paternal sister with a paternal brother: the half-siblings share the remainder", () => {
+    const r = calculateFaraid(census({ fullSisters: 2, paternalSisters: 1, paternalBrothers: 1 }));
+    expect(shareOf(r, "fullSisters").eq(frac(2, 3))).toBe(true);
+    expect(shareOf(r, "paternalBrothers").eq(frac(2, 9))).toBe(true);
+    expect(shareOf(r, "paternalSisters").eq(frac(1, 9))).toBe(true);
+  });
+
+  it("'awl 6→10: husband + mother + two full sisters + two uterine siblings", () => {
+    const r = calculateFaraid(
+      census({ testatorSex: "female", spouseCount: 1, mother: true, fullSisters: 2, maternalSiblings: 2 })
+    );
+    expect(shareOf(r, "husband").eq(frac(3, 10))).toBe(true);
+    expect(shareOf(r, "mother").eq(frac(1, 10))).toBe(true);
+    expect(shareOf(r, "fullSisters").eq(frac(4, 10))).toBe(true);
+    expect(shareOf(r, "maternalSiblings").eq(frac(2, 10))).toBe(true);
+  });
+
+  it("both grandmothers share one-sixth", () => {
+    const r = calculateFaraid(
+      census({ sons: 1, paternalGrandmother: true, maternalGrandmother: true })
+    );
+    const g = r.shares.find((s) => s.key === "grandmothers")!;
+    expect(g.share.eq(frac(1, 6))).toBe(true);
+    expect(g.perPerson.eq(frac(1, 12))).toBe(true);
+  });
+
+  it("rejects impossible input", () => {
+    expect(() => calculateFaraid(census({ testatorSex: "female", spouseCount: 2 }))).toThrow();
+    expect(() => calculateFaraid(census({ spouseCount: 5 }))).toThrow();
+    expect(() => calculateFaraid(census({ sons: -1 }))).toThrow();
+    expect(() => calculateFaraid(census({ daughters: 1.5 }))).toThrow();
+  });
 });
 
 describe("fara'id engine — invariants over randomized censuses", () => {
@@ -234,18 +338,75 @@ describe("fara'id engine — invariants over randomized censuses", () => {
         paternalSisters: rnd(3),
         maternalSiblings: rnd(3),
         hasOtherAgnates: rnd(2) === 1,
+        hasDistantKindred: rnd(2) === 1,
       });
       // the engine throws internally if the total is not exactly 1
       const r = calculateFaraid(c);
       if (!r.noHeirs) {
         expect(r.total.eq(frac(1))).toBe(true);
       }
-      // excluded rows carry zero and a reason
+      const seen = new Set<string>();
       for (const s of r.shares) {
-        if (s.basis === "excluded") {
-          expect(s.share.isZero()).toBe(true);
-          expect(s.reason.length).toBeGreaterThan(0);
-        }
+        // each heir group appears once
+        expect(seen.has(s.key)).toBe(false);
+        seen.add(s.key);
+        // no negative shares, and the per-person share multiplies back up
+        expect(s.share.lt(frac(0))).toBe(false);
+        expect(s.perPerson.mul(frac(s.count)).eq(s.share)).toBe(true);
+        expect(s.reason.length).toBeGreaterThan(0);
+        // excluded rows carry zero; everyone else carries something
+        expect(s.share.isZero()).toBe(s.basis === "excluded");
+      }
+    }
+  });
+
+  it("a spouse never takes more than their Qur'anic share unless they are the only heir", () => {
+    for (let i = 0; i < 2000; i++) {
+      const testatorSex = rnd(2) === 0 ? "male" : "female";
+      const c = census({
+        testatorSex,
+        spouseCount: 1,
+        sons: rnd(2),
+        daughters: rnd(3),
+        father: rnd(2) === 1,
+        mother: rnd(2) === 1,
+        fullSisters: rnd(3),
+        maternalSiblings: rnd(3),
+        hasOtherAgnates: rnd(2) === 1,
+        hasDistantKindred: rnd(2) === 1,
+      });
+      const r = calculateFaraid(c);
+      const key = testatorSex === "male" ? "wives" : "husband";
+      const hasDesc = c.sons + c.daughters > 0;
+      const cap = testatorSex === "male" ? (hasDesc ? frac(1, 8) : frac(1, 4)) : hasDesc ? frac(1, 4) : frac(1, 2);
+      const alone = r.shares.filter((s) => !s.share.isZero()).length === 1;
+      if (!alone) expect(shareOf(r, key).gt(cap)).toBe(false);
+    }
+  });
+
+  it("adding a son never increases what a brother, sister or remoter relative receives", () => {
+    const others = [
+      "fullBrothers", "fullSisters", "paternalBrothers", "paternalSisters",
+      "maternalSiblings", "otherAgnates", "distantKindred",
+    ];
+    for (let i = 0; i < 2000; i++) {
+      const c = census({
+        spouseCount: rnd(2),
+        daughters: rnd(3),
+        mother: rnd(2) === 1,
+        fullBrothers: rnd(3),
+        fullSisters: rnd(3),
+        paternalBrothers: rnd(2),
+        paternalSisters: rnd(2),
+        maternalSiblings: rnd(3),
+        hasOtherAgnates: rnd(2) === 1,
+        hasDistantKindred: rnd(2) === 1,
+      });
+      const before = calculateFaraid(c);
+      const after = calculateFaraid({ ...c, sons: 1 });
+      for (const k of others) {
+        expect(shareOf(after, k).gt(shareOf(before, k))).toBe(false);
+        expect(shareOf(after, k).isZero()).toBe(true);
       }
     }
   });

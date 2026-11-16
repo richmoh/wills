@@ -33,7 +33,7 @@ export async function SiteHeader() {
             <>
               <Link
                 href="/login"
-                className="hidden text-sm font-semibold text-forest-900 hover:text-forest-700 sm:block"
+                className="text-sm font-semibold text-forest-900 hover:text-forest-700"
               >
                 Sign in
               </Link>

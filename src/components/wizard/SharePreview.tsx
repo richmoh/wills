@@ -23,7 +23,7 @@ const CANONICAL_ORDER: HeirGroupKey[] = [
   "husband", "wives", "sons", "daughters", "grandsons", "granddaughters",
   "father", "mother", "paternalGrandfather", "grandmothers",
   "fullBrothers", "fullSisters", "paternalBrothers", "paternalSisters",
-  "maternalSiblings", "otherAgnates",
+  "maternalSiblings", "otherAgnates", "distantKindred",
 ];
 
 const BASIS_BADGE: Record<HeirShare["basis"], string> = {
@@ -31,6 +31,7 @@ const BASIS_BADGE: Record<HeirShare["basis"], string> = {
   residuary: "Residuary",
   "quranic-plus-residuary": "Share + residue",
   radd: "Share + return",
+  "distant-kindred": "Distant kindred",
   excluded: "Excluded",
 };
 

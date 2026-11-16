@@ -9,6 +9,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -20,7 +21,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, password }),
+        body: JSON.stringify(
+          mode === "signup" ? { fullName, email, password, consent } : { email, password }
+        ),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -82,9 +85,42 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
             minLength={mode === "signup" ? 8 : undefined}
+            maxLength={200}
             required
           />
+          {mode === "login" && (
+            <p className="mt-2 text-right text-sm">
+              <Link href="/forgot-password" className="font-medium text-forest-800 hover:underline">
+                Forgot your password?
+              </Link>
+            </p>
+          )}
         </div>
+        {mode === "signup" && (
+          <div className="flex items-start gap-3">
+            <input
+              id="consent"
+              type="checkbox"
+              className="mt-1 h-4 w-4 shrink-0 accent-forest-800"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              required
+            />
+            <label htmlFor="consent" className="text-sm leading-6 text-ink/75">
+              I understand Wasiyyah will store my answers — which reveal my
+              religion and details about my family — so it can prepare and keep
+              my will, and I consent to this. See the{" "}
+              <Link
+                href="/legal/privacy"
+                target="_blank"
+                className="font-semibold text-forest-800 underline"
+              >
+                privacy policy
+              </Link>
+              .
+            </label>
+          </div>
+        )}
       </div>
       {error && (
         <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">

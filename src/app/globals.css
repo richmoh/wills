@@ -89,7 +89,13 @@ body {
   }
   @page {
     size: A4;
-    margin: 22mm 20mm;
+    margin: 22mm 20mm 24mm;
+    /* numbered pages make a substituted or missing sheet obvious */
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 9pt;
+      color: #6b6b6b;
+    }
   }
   .will-clause {
     break-inside: avoid;

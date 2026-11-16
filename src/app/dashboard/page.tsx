@@ -10,6 +10,7 @@ import {
   NewWillButton,
   UpgradeButton,
 } from "@/components/DashboardActions";
+import { canMirror, normalizeWillData } from "@/lib/will-types";
 
 export const metadata = { title: "My wills" };
 
@@ -18,6 +19,7 @@ interface WillRow {
   label: string;
   status: string;
   updated_at: string;
+  data: unknown;
 }
 
 export default async function Dashboard({
@@ -30,8 +32,16 @@ export default async function Dashboard({
 
   const { upgraded } = await searchParams;
   const wills = await query<WillRow>(
-    `select id, label, status, updated_at from wills where user_id = $1 order by created_at`,
+    `select id, label, status, updated_at, data from wills where user_id = $1 order by created_at`,
     [user.id]
+  );
+
+  // a spouse's mirror will can be started from any will that names one spouse,
+  // unless that spouse already has a will here
+  const answers = wills.map((w) => ({ id: w.id, data: normalizeWillData(w.data) }));
+  const testators = new Set(answers.map((a) => a.data.fullName.trim().toLowerCase()));
+  const mirrorable = answers.filter(
+    (a) => canMirror(a.data) && !testators.has(a.data.spouseName.trim().toLowerCase())
   );
 
   return (
@@ -54,7 +64,12 @@ export default async function Dashboard({
                 )}
               </p>
             </div>
-            <LogoutButton />
+            <div className="flex items-center gap-5">
+              <Link href="/account" className="text-sm font-medium text-ink/55 hover:text-forest-800">
+                Account
+              </Link>
+              <LogoutButton />
+            </div>
           </div>
 
           {upgraded && (
@@ -125,7 +140,19 @@ export default async function Dashboard({
             {wills.length > 0 && (
               <div className="pt-2">
                 {user.is_premium ? (
-                  <NewWillButton label="Start another will (e.g. your spouse's mirror will)" />
+                  <div className="flex flex-wrap items-start gap-3">
+                    {mirrorable.map((m) => (
+                      <NewWillButton
+                        key={m.id}
+                        mirrorOf={m.id}
+                        label={`Create a mirror will for ${m.data.spouseName.trim()}`}
+                      />
+                    ))}
+                    <NewWillButton
+                      label="Start another will"
+                      className={mirrorable.length > 0 ? "btn-ghost" : "btn-primary"}
+                    />
+                  </div>
                 ) : (
                   <div className="card flex flex-wrap items-center justify-between gap-4 border-gold-300/60 bg-gold-100/30">
                     <div className="max-w-lg">

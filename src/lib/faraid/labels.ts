@@ -17,6 +17,7 @@ export const HEIR_LABELS: Record<HeirGroupKey, { singular: string; plural: strin
   paternalSisters: { singular: "Paternal half-sister", plural: "Paternal half-sisters" },
   maternalSiblings: { singular: "Maternal (uterine) sibling", plural: "Maternal (uterine) siblings" },
   otherAgnates: { singular: "Nearest male-line relative", plural: "Nearest male-line relatives" },
+  distantKindred: { singular: "Other blood relatives (dhawu al-arham)", plural: "Other blood relatives (dhawu al-arham)" },
 };
 
 export function heirLabel(key: HeirGroupKey, count: number): string {

@@ -3,7 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function NewWillButton({ label = "Start a new will" }: { label?: string }) {
+export function NewWillButton({
+  label = "Start a new will",
+  mirrorOf,
+  className = "btn-primary",
+}: {
+  label?: string;
+  /** create the spouse's will, pre-filled from this will */
+  mirrorOf?: string;
+  className?: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -11,19 +20,27 @@ export function NewWillButton({ label = "Start a new will" }: { label?: string }
   const create = async () => {
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/wills", { method: "POST" });
-    const body = await res.json().catch(() => ({}));
-    if (res.ok) {
-      router.push(`/will/${body.id}/edit`);
-      return;
+    try {
+      const res = await fetch("/api/wills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mirrorOf ? { mirrorOf } : {}),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        router.push(`/will/${body.id}/edit`);
+        return;
+      }
+      setError(body.error ?? "Could not create a will — please try again.");
+    } catch {
+      setError("Could not reach the server — please check your connection and try again.");
     }
-    setError(body.error ?? "Could not create a will — please try again.");
     setBusy(false);
   };
 
   return (
     <div>
-      <button onClick={create} disabled={busy} className="btn-primary">
+      <button onClick={create} disabled={busy} className={className}>
         {busy ? "One moment…" : label}
       </button>
       {error && (
@@ -42,17 +59,21 @@ export function UpgradeButton({ className = "btn-gold" }: { className?: string }
   const upgrade = async () => {
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/stripe/checkout", { method: "POST" });
-    const body = await res.json().catch(() => ({}));
-    if (res.ok && body.url) {
-      window.location.href = body.url;
-      return;
+    try {
+      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.url) {
+        window.location.href = body.url;
+        return;
+      }
+      if (res.status === 401) {
+        window.location.href = "/signup";
+        return;
+      }
+      setError(body.error ?? "Could not start checkout — please try again.");
+    } catch {
+      setError("Could not reach the server — please check your connection and try again.");
     }
-    if (res.status === 401) {
-      window.location.href = "/signup";
-      return;
-    }
-    setError(body.error ?? "Could not start checkout — please try again.");
     setBusy(false);
   };
 

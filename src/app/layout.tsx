@@ -26,11 +26,11 @@ export const metadata: Metadata = {
     template: "%s · Wasiyyah",
   },
   description:
-    "Make a professionally drafted Islamic will, valid in England & Wales, in about 15 minutes. Exact Qur'anic shares, clear English, free to start.",
+    "Make an Islamic will drafted for England & Wales in about 15 minutes. Exact Qur'anic shares with the working shown, clear English, free to start.",
   openGraph: {
     title: "Wasiyyah — Your Islamic will, done properly",
     description:
-      "A fara'id-compliant will, valid in England & Wales, from a 15-minute guided interview.",
+      "A will that follows the Qur'anic shares, drafted for England & Wales, from a 15-minute guided interview.",
     type: "website",
   },
 };

@@ -84,14 +84,13 @@ export function calculateFaraid(census: HeirCensus): FaraidResult {
 
   const fullSiblingsExcluded = fatherOrGF || hasMaleDesc;
   if (fullSiblingsExcluded && c.fullBrothers + c.fullSisters > 0) {
-    note(
-      c.fullBrothers > 0 ? "fullBrothers" : "fullSisters",
-      hasMaleDesc
-        ? "Full siblings are excluded by a male descendant (son or son's son)."
-        : fatherPresent
-          ? "Full siblings are excluded by the father."
-          : "Full siblings are excluded by the paternal grandfather (Hanafi position; other schools apportion — noted for scholar review)."
-    );
+    const reason = hasMaleDesc
+      ? "Full siblings are excluded by a male descendant (son or son's son)."
+      : fatherPresent
+        ? "Full siblings are excluded by the father."
+        : "Full siblings are excluded by the paternal grandfather (Hanafi position; other schools apportion — noted for scholar review).";
+    if (c.fullBrothers > 0) note("fullBrothers", reason);
+    if (c.fullSisters > 0) note("fullSisters", reason);
   }
 
   const maternalSiblingsExcluded = hasDesc || fatherOrGF;
@@ -254,18 +253,26 @@ export function calculateFaraid(census: HeirCensus): FaraidResult {
 
   const paternalSiblingsExcludedBase =
     fatherOrGF || hasMaleDesc || c.fullBrothers > 0;
-  if (paternalSiblingsExcludedBase && c.paternalBrothers + c.paternalSisters > 0 && !fullSiblingsExcluded) {
-    note(
-      c.paternalBrothers > 0 ? "paternalBrothers" : "paternalSisters",
-      "Paternal half-siblings are excluded by a full brother."
-    );
-  } else if ((fatherOrGF || hasMaleDesc) && c.paternalBrothers + c.paternalSisters > 0) {
-    note(
-      c.paternalBrothers > 0 ? "paternalBrothers" : "paternalSisters",
-      hasMaleDesc
-        ? "Paternal half-siblings are excluded by a male descendant."
-        : "Paternal half-siblings are excluded by the father or paternal grandfather."
-    );
+  // a full sister made residuary by a daughter or son's daughter stands in a
+  // full brother's place and excludes the paternal half-siblings
+  const femaleDescInherits =
+    c.daughters > 0 || (c.granddaughters > 0 && !grandchildrenExcluded);
+  const fullSisterResiduary =
+    !fullSiblingsExcluded && c.fullBrothers === 0 && c.fullSisters > 0 && femaleDescInherits;
+  if (c.paternalBrothers + c.paternalSisters > 0) {
+    const reason = hasMaleDesc
+      ? "Paternal half-siblings are excluded by a male descendant."
+      : fatherOrGF
+        ? "Paternal half-siblings are excluded by the father or paternal grandfather."
+        : c.fullBrothers > 0
+          ? "Paternal half-siblings are excluded by a full brother."
+          : fullSisterResiduary
+            ? "Paternal half-siblings are excluded by a full sister who takes the remainder alongside the daughters."
+            : null;
+    if (reason) {
+      if (c.paternalBrothers > 0) note("paternalBrothers", reason);
+      if (c.paternalSisters > 0) note("paternalSisters", reason);
+    }
   }
 
   let paternalSistersFixed = false;
@@ -334,6 +341,7 @@ export function calculateFaraid(census: HeirCensus): FaraidResult {
 
   // ------------------------------------------------------------- residue ----
   let residue = Fraction.ONE.sub(fixedTotal);
+  const fixedSharesExhaustEstate = residue.isZero();
   let raddApplied = false;
 
   const setResiduary = (key: HeirGroupKey, share: Fraction, reason: string) => {
@@ -362,14 +370,12 @@ export function calculateFaraid(census: HeirCensus): FaraidResult {
     const units = frac(2 * males + females);
     const maleShare = amount.mul(frac(2 * males)).div(units);
     const femaleShare = amount.mul(frac(females)).div(units);
-    if (males > 0 && !maleShare.isZero()) setResiduary(maleKey, maleShare, maleReason);
-    if (females > 0 && !femaleShare.isZero()) setResiduary(femaleKey, femaleShare, femaleReason);
-    else if (females > 0 && femaleShare.isZero()) setResiduary(femaleKey, femaleShare, femaleReason);
+    if (males > 0) setResiduary(maleKey, maleShare, maleReason);
+    if (females > 0) setResiduary(femaleKey, femaleShare, femaleReason);
   };
 
   if (!residue.isZero() && residue.gt(Fraction.ZERO)) {
-    const femaleDescPresent =
-      c.daughters > 0 || (c.granddaughters > 0 && !grandchildrenExcluded);
+    const femaleDescPresent = femaleDescInherits;
 
     if (c.sons > 0) {
       splitTwoToOne(
@@ -448,6 +454,21 @@ export function calculateFaraid(census: HeirCensus): FaraidResult {
         "Residue to the nearest male-line relative(s) in the established fiqh order (nephew, then paternal uncle, then cousin). The executor must identify the nearest class living at death."
       );
       trace.push({ step: "Residuaries ('asaba)", detail: `Residue of ${residue.toString()} passes to the nearest agnatic relative(s).` });
+    } else if (
+      c.hasDistantKindred &&
+      [...shares.keys()].every((k) => k === "husband" || k === "wives")
+    ) {
+      // ------------------------------------------------- dhawu al-arham ----
+      shares.set("distantKindred", {
+        share: residue,
+        basis: "distant-kindred",
+        reason:
+          "The remainder passes to the other blood relatives (dhawu al-arham), because no fixed-share heir other than a spouse and no residuary heir survives (Hanafi and Hanbali position). Their order and shares follow detailed rules — the executor must obtain a scholar's written determination.",
+      });
+      trace.push({
+        step: "Distant kindred (dhawu al-arham)",
+        detail: `No sharer other than a spouse and no residuary heir survives; the remainder of ${residue.toString()} passes to the other blood relatives. This engine does not apportion between them — flagged for scholar determination.`,
+      });
     } else if (shares.size > 0) {
       // ------------------------------------------------------------ radd ----
       raddApplied = true;
@@ -520,8 +541,41 @@ export function calculateFaraid(census: HeirCensus): FaraidResult {
       case "paternalSisters": return c.paternalSisters;
       case "maternalSiblings": return c.maternalSiblings;
       case "otherAgnates": return 1;
+      case "distantKindred": return 1;
     }
   };
+
+  // every relative entered must appear in the result: with a share, or with the
+  // reason they take nothing
+  const present: [HeirGroupKey, boolean][] = [
+    ["sons", c.sons > 0],
+    ["daughters", c.daughters > 0],
+    ["grandsons", c.grandsons > 0],
+    ["granddaughters", c.granddaughters > 0],
+    ["fullBrothers", c.fullBrothers > 0],
+    ["fullSisters", c.fullSisters > 0],
+    ["paternalBrothers", c.paternalBrothers > 0],
+    ["paternalSisters", c.paternalSisters > 0],
+    ["maternalSiblings", c.maternalSiblings > 0],
+    ["otherAgnates", c.hasOtherAgnates],
+    ["distantKindred", c.hasDistantKindred],
+  ];
+  for (const [key, isPresent] of present) {
+    if (!isPresent) continue;
+    const got = shares.get(key);
+    if ((got && !got.share.isZero()) || excluded.some((e) => e.key === key)) continue;
+    excluded.push({
+      key,
+      reason:
+        key === "distantKindred"
+          ? "Other blood relatives inherit only when there is no fixed-share heir (other than a spouse) and no residuary heir."
+          : key === "otherAgnates"
+            ? "Nearer heirs take the whole estate, so the more distant male-line relatives receive nothing."
+            : fixedSharesExhaustEstate
+              ? "The fixed shares use up the whole estate, so nothing remains for the residuary heirs."
+              : "Nearer heirs take the whole estate.",
+    });
+  }
 
   const result: HeirShare[] = [...shares.entries()]
     .filter(([, v]) => !v.share.isZero())

@@ -1,7 +1,9 @@
+import { createHash } from "crypto";
 import { calculateFaraid } from "./faraid/engine";
-import type { FaraidResult } from "./faraid/types";
+import type { FaraidResult, HeirCensus, HeirGroupKey } from "./faraid/types";
 import { heirLabel } from "./faraid/labels";
-import type { WillData } from "./will-types";
+import { askedCensus } from "./interview";
+import { AGNATE_KINDS, type WillData } from "./will-types";
 
 export interface Clause {
   heading: string;
@@ -31,13 +33,22 @@ export interface WillDocument {
   shareRows: ShareRow[];
   result: FaraidResult;
   extras: ExtraDoc[];
+  /**
+   * A short fingerprint of the will's wording. It is printed on the document,
+   * so a signed copy can be matched to the exact text it was generated from.
+   */
+  reference: string;
 }
 
 const join = (names: string[]) =>
   names.filter((n) => n.trim()).join(", ");
 
 export function buildWillDocument(d: WillData, isPremium: boolean): WillDocument {
-  const result = calculateFaraid(d.census);
+  // only the answers the interview actually asked for reach the will
+  const census = askedCensus(d.census);
+  const result = calculateFaraid(census);
+  const takes = (key: HeirGroupKey) =>
+    result.shares.some((s) => s.key === key && !s.share.isZero());
   const clauses: Clause[] = [];
 
   const spouseTitle =
@@ -141,11 +152,28 @@ export function buildWillDocument(d: WillData, isPremium: boolean): WillDocument
   }
 
   // 7 — residue per fara'id
-  const shareRows = buildShareRows(d, result);
+  const shareRows = buildShareRows(d, census, result);
+  const agnate = AGNATE_KINDS.find((k) => k.value === d.agnateKind);
+  const remoter: string[] = [];
+  if (takes("otherAgnates")) {
+    remoter.push(
+      `The share shown for my nearest male-line relative passes to ${
+        agnate ? `${agnate.phrase} (or, if more than one, to them in equal shares)` : "the nearest of my male-line relatives under the Islamic law of inheritance"
+      }${d.agnateNames.trim() ? `, namely ${d.agnateNames.trim()}` : ""}. If no such person survives me, it passes to whoever is then my nearest male-line relative under that law.`
+    );
+  }
+  if (takes("distantKindred")) {
+    remoter.push(
+      `The share shown for my other blood relatives passes to those of my relatives who are entitled to it as distant kindred (dhawu al-arham) under the Hanafi school of Islamic law${
+        d.distantKindredNames.trim() ? `, whom I believe to include ${d.distantKindredNames.trim()}` : ""
+      }, in the shares that law prescribes, as determined in writing by a suitably qualified Islamic scholar or recognised UK fiqh body, whose determination my executors may treat as conclusive.`
+    );
+  }
   clauses.push({
     heading: "Residuary estate — the Islamic shares",
     paragraphs: [
       `I give the residue of my estate, after payment of the above, to my heirs under the Islamic law of inheritance in the shares set out below, which have been calculated according to the Qur'an (4:11, 4:12 and 4:176) and the sunnah on the basis of my family at the date of this will:`,
+      ...remoter,
       `If the relatives who survive me differ from those listed — through birth, death, marriage or divorce after the date of this will — my executors shall instead distribute the residue among my heirs living at my death strictly according to the Islamic law of inheritance, taking the written determination of a suitably qualified Islamic scholar or recognised UK fiqh body as conclusive.`,
       result.noHeirs
         ? `If, as at present, no fara'id heir survives me, the residue shall pass under the following clause.`
@@ -195,6 +223,12 @@ export function buildWillDocument(d: WillData, isPremium: boolean): WillDocument
     extras.push(estateChecklist(d));
   }
 
+  const reference = createHash("sha256")
+    .update(JSON.stringify([d.fullName, d.address, clauses, shareRows]))
+    .digest("hex")
+    .slice(0, 10)
+    .toUpperCase();
+
   return {
     testatorName: d.fullName,
     testatorAddress: d.address,
@@ -202,25 +236,47 @@ export function buildWillDocument(d: WillData, isPremium: boolean): WillDocument
     shareRows,
     result,
     extras,
+    reference,
   };
 }
 
-function buildShareRows(d: WillData, result: FaraidResult): ShareRow[] {
-  const namesFor = (key: string): string | undefined => {
+function buildShareRows(d: WillData, census: HeirCensus, result: FaraidResult): ShareRow[] {
+  const group = (g: keyof WillData["heirNames"], count: number) =>
+    join((d.heirNames[g] ?? []).slice(0, count)) || undefined;
+  const namesFor = (key: HeirGroupKey): string | undefined => {
     switch (key) {
       case "husband":
       case "wives":
         return d.spouseName.trim() || undefined;
       case "sons":
-        return join(d.sonNames) || undefined;
+        return join(d.sonNames.slice(0, census.sons)) || undefined;
       case "daughters":
-        return join(d.daughterNames) || undefined;
+        return join(d.daughterNames.slice(0, census.daughters)) || undefined;
       case "father":
         return d.fatherName.trim() || undefined;
       case "mother":
         return d.motherName.trim() || undefined;
-      default:
-        return undefined;
+      case "grandmothers":
+        return (
+          join([
+            ...(census.paternalGrandmother ? (d.heirNames.paternalGrandmother ?? []).slice(0, 1) : []),
+            ...(census.maternalGrandmother ? (d.heirNames.maternalGrandmother ?? []).slice(0, 1) : []),
+          ]) || undefined
+        );
+      case "paternalGrandfather":
+        return group("paternalGrandfather", 1);
+      case "grandsons":
+      case "granddaughters":
+      case "fullBrothers":
+      case "fullSisters":
+      case "paternalBrothers":
+      case "paternalSisters":
+      case "maternalSiblings":
+        return group(key, census[key]);
+      case "otherAgnates":
+        return d.agnateNames.trim() || undefined;
+      case "distantKindred":
+        return d.distantKindredNames.trim() || undefined;
     }
   };
   return result.shares

@@ -5,7 +5,24 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { calculateFaraid } from "@/lib/faraid/engine";
 import type { HeirCensus } from "@/lib/faraid/types";
-import { solicitorFlags, type Bequest, type WillData } from "@/lib/will-types";
+import {
+  askedCensus,
+  BEQUEST_CAP_PERCENT,
+  censusQuestions,
+  firstIncompleteStep,
+  percentBequestTotal as bequestTotal,
+  validateStep as validate,
+  visibleSteps,
+  type StepId,
+} from "@/lib/interview";
+import {
+  AGNATE_KINDS,
+  solicitorFlags,
+  type AgnateKind,
+  type Bequest,
+  type NamedGroup,
+  type WillData,
+} from "@/lib/will-types";
 import { SharePreview } from "./SharePreview";
 import {
   ChoiceField,
@@ -15,75 +32,6 @@ import {
   TextField,
   YesNo,
 } from "./fields";
-
-type StepId =
-  | "about"
-  | "marriage"
-  | "children"
-  | "grandchildren"
-  | "parents"
-  | "grandparents"
-  | "siblings"
-  | "agnates"
-  | "executors"
-  | "guardians"
-  | "funeral"
-  | "bequests"
-  | "debts"
-  | "wishes"
-  | "estate"
-  | "review";
-
-interface StepDef {
-  id: StepId;
-  title: string;
-  intro?: string;
-  premium?: boolean;
-}
-
-function visibleSteps(d: WillData): StepDef[] {
-  const c = d.census;
-  const noMaleLine =
-    c.sons === 0 && c.grandsons === 0 && !c.father && !c.paternalGrandfather;
-  const steps: (StepDef | false)[] = [
-    { id: "about", title: "About you" },
-    { id: "marriage", title: "Your marriage" },
-    { id: "children", title: "Your children" },
-    c.sons === 0 && {
-      id: "grandchildren",
-      title: "Grandchildren through a son",
-      intro:
-        "In Islamic law, the children of a son who passed away before you can inherit in his place. Children of daughters are provided for differently (through the optional bequest).",
-    },
-    { id: "parents", title: "Your parents" },
-    (!c.father || !c.mother) && {
-      id: "grandparents",
-      title: "Your grandparents",
-      intro: "A grandparent can inherit when the parent through whom they are related has passed away.",
-    },
-    noMaleLine && {
-      id: "siblings",
-      title: "Your siblings",
-      intro:
-        "Because you have no son, no father and no paternal grandfather living, your siblings may inherit. If your family changes, regenerate your will and this updates automatically.",
-    },
-    noMaleLine &&
-      c.fullBrothers === 0 &&
-      c.paternalBrothers === 0 && {
-        id: "agnates",
-        title: "Wider family",
-      },
-    { id: "executors", title: "Your executors" },
-    d.hasMinorChildren && { id: "guardians", title: "Guardians for your children" },
-    { id: "funeral", title: "Funeral & burial wishes" },
-    { id: "bequests", title: "Charitable bequests (wasiyya)", premium: true },
-    { id: "debts", title: "Religious debts", premium: true },
-    { id: "wishes", title: "Letter of wishes", premium: true },
-    { id: "estate", title: "About your estate" },
-    { id: "review", title: "Review & generate" },
-  ];
-  return steps.filter(Boolean) as StepDef[];
-}
 
 export function WillWizard({
   willId,
@@ -96,25 +44,40 @@ export function WillWizard({
 }) {
   const router = useRouter();
   const [data, setData] = useState<WillData>(initialData);
-  const [stepIndex, setStepIndex] = useState(0);
+  // resume on the step the user last had open
+  const [stepIndex, setStepIndex] = useState(() =>
+    Math.max(0, visibleSteps(initialData).findIndex((s) => s.id === initialData.lastStep))
+  );
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [stepError, setStepError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [grandchildrenOpen, setGrandchildrenOpen] = useState(
+    initialData.census.grandsons + initialData.census.granddaughters > 0
+  );
 
   const steps = visibleSteps(data);
   const step = steps[Math.min(stepIndex, steps.length - 1)];
+  // the census as asked: answers to questions that are no longer shown are ignored
+  const census = useMemo(() => askedCensus(data.census), [data.census]);
+  const q = censusQuestions(census);
 
   const set = (patch: Partial<WillData>) => setData((d) => ({ ...d, ...patch }));
   const setCensus = (patch: Partial<HeirCensus>) =>
     setData((d) => ({ ...d, census: { ...d.census, ...patch } }));
+  const setNames = (group: NamedGroup, list: string[]) =>
+    setData((d) => ({ ...d, heirNames: { ...d.heirNames, [group]: list } }));
+  const namesOf = (group: NamedGroup) => data.heirNames[group] ?? [];
 
-  // ----- autosave (debounced) -----
+  // ----- autosave (debounced, flushed when the page is left) -----
   const firstRender = useRef(true);
+  const pending = useRef<WillData | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
+    pending.current = data;
     setSaveState("saving");
     const t = setTimeout(async () => {
       try {
@@ -123,65 +86,76 @@ export function WillWizard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ data }),
         });
+        if (res.ok && pending.current === data) pending.current = null;
         setSaveState(res.ok ? "saved" : "error");
       } catch {
         setSaveState("error");
       }
     }, 900);
+    saveTimer.current = t;
     return () => clearTimeout(t);
   }, [data, willId]);
 
+  useEffect(() => {
+    const flush = () => {
+      if (!pending.current) return;
+      fetch(`/api/wills/${willId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: pending.current }),
+        keepalive: true,
+      }).catch(() => {});
+      pending.current = null;
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [willId]);
+
   const result = useMemo(() => {
     try {
-      return calculateFaraid(data.census);
+      return calculateFaraid(census);
     } catch {
       return null;
     }
-  }, [data.census]);
+  }, [census]);
 
   const showShares = ["children", "grandchildren", "parents", "grandparents", "siblings", "agnates", "review"].includes(step.id);
 
-  const percentBequestTotal = data.bequests
-    .filter((b) => b.kind === "percentage")
-    .reduce((acc, b) => acc + (parseFloat(b.value) || 0), 0);
+  const percentBequestTotal = bequestTotal(data);
 
-  const validateStep = (): string | null => {
-    if (step.id === "about") {
-      if (data.fullName.trim().length < 2) return "Please enter your full legal name.";
-      if (data.address.trim().length < 5) return "Please enter your address — the will must identify you clearly.";
-    }
-    if (step.id === "executors") {
-      const named = data.executors.filter((e) => e.name.trim().length > 1);
-      if (named.length === 0) return "Please appoint at least one executor.";
-    }
-    if (step.id === "guardians") {
-      const named = data.guardians.filter((g) => g.name.trim().length > 1);
-      if (named.length === 0) return "Please appoint at least one guardian for your children under 18.";
-    }
-    if (step.id === "bequests" && isPremium && percentBequestTotal > 100 / 3 + 1e-9) {
-      return `Bequests may not exceed one-third of your estate (currently ${percentBequestTotal.toFixed(1)}%). This is the limit the Prophet ﷺ set — "a third, and a third is much".`;
-    }
-    return null;
+  const goTo = (index: number) => {
+    const i = Math.max(0, Math.min(index, steps.length - 1));
+    setStepError(null);
+    setStepIndex(i);
+    set({ lastStep: steps[i].id });
+    window.scrollTo({ top: 0 });
   };
-
   const goNext = () => {
-    const err = validateStep();
+    const err = validate(step.id, data, isPremium);
     if (err) {
       setStepError(err);
       return;
     }
-    setStepError(null);
-    setStepIndex((i) => Math.min(i + 1, steps.length - 1));
-    window.scrollTo({ top: 0 });
+    goTo(stepIndex + 1);
   };
-  const goBack = () => {
-    setStepError(null);
-    setStepIndex((i) => Math.max(i - 1, 0));
-    window.scrollTo({ top: 0 });
-  };
+  const goBack = () => goTo(stepIndex - 1);
 
   const generate = async () => {
+    // every required answer is re-checked, however the user reached this step
+    const missing = firstIncompleteStep(data, isPremium);
+    if (missing) {
+      goTo(steps.findIndex((s) => s.id === missing.id));
+      setStepError(missing.message);
+      return;
+    }
     setGenerating(true);
+    // a draft autosave still waiting to fire would land after the will is
+    // generated and quietly turn it back into a draft
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    pending.current = null;
     try {
       const res = await fetch(`/api/wills/${willId}`, {
         method: "PUT",
@@ -189,12 +163,16 @@ export function WillWizard({
         body: JSON.stringify({ data, status: "complete" }),
       });
       if (res.ok) {
+        pending.current = null;
         router.push(`/will/${willId}/document`);
         return;
       }
-    } catch {}
+      const body = await res.json().catch(() => ({}));
+      setStepError(body.error ?? "Something went wrong saving your will — please try again.");
+    } catch {
+      setStepError("Something went wrong saving your will — please try again.");
+    }
     setGenerating(false);
-    setStepError("Something went wrong saving your will — please try again.");
   };
 
   // ------------------------------------------------------------- rendering --
@@ -230,6 +208,7 @@ export function WillWizard({
           )}
 
           <div className="mt-6 space-y-6">
+            {data.hasNonMuslimRelatives && FAMILY_STEPS.includes(step.id) && <MuslimOnlyNote />}
             {renderStep()}
           </div>
 
@@ -325,6 +304,26 @@ export function WillWizard({
                 { value: "female", label: "Female" },
               ]}
             />
+            <YesNo
+              label="Are any of your close relatives not Muslim?"
+              hint="your husband or wife, children, parents, brothers or sisters"
+              value={data.hasNonMuslimRelatives}
+              onChange={(v) => {
+                set({ hasNonMuslimRelatives: v });
+                // without the follow-up questions a married person has at least one inheriting spouse
+                if (!v && data.maritalStatus === "married" && data.census.spouseCount === 0)
+                  setCensus({ spouseCount: 1 });
+              }}
+            />
+            {data.hasNonMuslimRelatives && (
+              <p className="max-w-xl rounded-xl bg-gold-100/70 px-4 py-3 text-sm leading-6 text-ink/75">
+                The four Sunni schools agree that a relative who is not Muslim
+                does not take a fixed share of a Muslim&rsquo;s estate. In the
+                family questions that follow, count only your Muslim relatives.
+                You can still provide for the others through a bequest
+                (wasiyya) of up to one-third of your estate.
+              </p>
+            )}
           </>
         );
 
@@ -351,19 +350,41 @@ export function WillWizard({
               <>
                 {data.sex === "male" && (
                   <CountField
-                    label="Number of wives"
-                    hint="an Islamic marriage may include up to four"
+                    label={data.hasNonMuslimRelatives ? "Wives who are Muslim" : "Number of wives"}
+                    hint={
+                      data.hasNonMuslimRelatives
+                        ? "only a Muslim wife takes the wife's share"
+                        : "an Islamic marriage may include up to four"
+                    }
                     value={data.census.spouseCount}
                     max={4}
-                    onChange={(v) => setCensus({ spouseCount: Math.max(1, v) })}
+                    onChange={(v) => setCensus({ spouseCount: Math.max(data.hasNonMuslimRelatives ? 0 : 1, v) })}
                   />
                 )}
-                <TextField
-                  label={data.sex === "male" ? (data.census.spouseCount > 1 ? "Wives' full names" : "Wife's full name") : "Husband's full name"}
-                  value={data.spouseName}
-                  onChange={(v) => set({ spouseName: v })}
-                  placeholder={data.census.spouseCount > 1 ? "Separate names with commas" : "Full legal name"}
-                />
+                {data.sex === "female" && data.hasNonMuslimRelatives && (
+                  <YesNo
+                    label="Is your husband Muslim?"
+                    value={data.census.spouseCount === 1}
+                    onChange={(v) => setCensus({ spouseCount: v ? 1 : 0 })}
+                  />
+                )}
+                {data.census.spouseCount > 0 ? (
+                  <TextField
+                    label={data.sex === "male" ? (data.census.spouseCount > 1 ? "Wives' full names" : "Wife's full name") : "Husband's full name"}
+                    value={data.spouseName}
+                    onChange={(v) => set({ spouseName: v })}
+                    placeholder={data.census.spouseCount > 1 ? "Separate names with commas" : "Full legal name"}
+                  />
+                ) : (
+                  <p className="max-w-xl rounded-xl bg-gold-100/70 px-4 py-3 text-sm leading-6 text-ink/75">
+                    Your {data.sex === "male" ? "wife" : "husband"} will not take
+                    a fixed share. You can provide for{" "}
+                    {data.sex === "male" ? "her" : "him"} with a bequest of up
+                    to one-third in the bequests step — and because English law
+                    lets a spouse claim reasonable provision, a solicitor&rsquo;s
+                    advice is strongly recommended.
+                  </p>
+                )}
               </>
             )}
           </>
@@ -418,25 +439,29 @@ export function WillWizard({
           <>
             <YesNo
               label="Did a son of yours pass away leaving children of his own?"
-              value={data.census.grandsons + data.census.granddaughters > 0}
+              value={grandchildrenOpen}
               onChange={(v) => {
+                setGrandchildrenOpen(v);
                 if (!v) setCensus({ grandsons: 0, granddaughters: 0 });
-                else setCensus({ grandsons: Math.max(1, data.census.grandsons) });
               }}
             />
-            {data.census.grandsons + data.census.granddaughters > 0 && (
-              <div className="grid gap-5 sm:grid-cols-2">
-                <CountField
-                  label="His sons (your grandsons)"
-                  value={data.census.grandsons}
-                  onChange={(v) => setCensus({ grandsons: v })}
-                />
-                <CountField
-                  label="His daughters (your granddaughters)"
-                  value={data.census.granddaughters}
-                  onChange={(v) => setCensus({ granddaughters: v })}
-                />
-              </div>
+            {grandchildrenOpen && (
+              <>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <CountField
+                    label="His sons (your grandsons)"
+                    value={data.census.grandsons}
+                    onChange={(v) => setCensus({ grandsons: v })}
+                  />
+                  <CountField
+                    label="His daughters (your granddaughters)"
+                    value={data.census.granddaughters}
+                    onChange={(v) => setCensus({ granddaughters: v })}
+                  />
+                </div>
+                <NameList label="Grandsons' names" names={namesOf("grandsons")} count={data.census.grandsons} onChange={(v) => setNames("grandsons", v)} />
+                <NameList label="Granddaughters' names" names={namesOf("granddaughters")} count={data.census.granddaughters} onChange={(v) => setNames("granddaughters", v)} />
+              </>
             )}
           </>
         );
@@ -466,33 +491,40 @@ export function WillWizard({
       case "grandparents":
         return (
           <>
-            {!data.census.father && (
+            {q.paternalGrandfather && (
               <YesNo
                 label="Is your father's father living?"
                 value={data.census.paternalGrandfather}
                 onChange={(v) => setCensus({ paternalGrandfather: v })}
               />
             )}
-            {!data.census.mother && (
+            {q.paternalGrandfather && data.census.paternalGrandfather && (
+              <NameList label="His full name" names={namesOf("paternalGrandfather")} count={1} onChange={(v) => setNames("paternalGrandfather", v)} />
+            )}
+            {q.maternalGrandmother && (
               <YesNo
                 label="Is your mother's mother living?"
                 value={data.census.maternalGrandmother}
                 onChange={(v) => setCensus({ maternalGrandmother: v })}
               />
             )}
-            {!data.census.father && !data.census.mother && (
+            {q.maternalGrandmother && data.census.maternalGrandmother && (
+              <NameList label="Her full name" names={namesOf("maternalGrandmother")} count={1} onChange={(v) => setNames("maternalGrandmother", v)} />
+            )}
+            {q.paternalGrandmother && (
               <YesNo
                 label="Is your father's mother living?"
                 value={data.census.paternalGrandmother}
                 onChange={(v) => setCensus({ paternalGrandmother: v })}
               />
             )}
+            {q.paternalGrandmother && data.census.paternalGrandmother && (
+              <NameList label="Her full name" names={namesOf("paternalGrandmother")} count={1} onChange={(v) => setNames("paternalGrandmother", v)} />
+            )}
           </>
         );
 
-      case "siblings": {
-        const noDescendants =
-          data.census.sons + data.census.daughters + data.census.grandsons + data.census.granddaughters === 0;
+      case "siblings":
         return (
           <>
             <div className="grid gap-5 sm:grid-cols-2">
@@ -518,7 +550,7 @@ export function WillWizard({
                 onChange={(v) => setCensus({ paternalSisters: v })}
               />
             </div>
-            {noDescendants && (
+            {q.maternalSiblings && (
               <CountField
                 label="Half-siblings from your mother"
                 hint="brothers and sisters share equally"
@@ -526,18 +558,80 @@ export function WillWizard({
                 onChange={(v) => setCensus({ maternalSiblings: v })}
               />
             )}
+            {q.siblingsInherit && (
+              <>
+                <NameList label="Full brothers' names" names={namesOf("fullBrothers")} count={census.fullBrothers} onChange={(v) => setNames("fullBrothers", v)} />
+                <NameList label="Full sisters' names" names={namesOf("fullSisters")} count={census.fullSisters} onChange={(v) => setNames("fullSisters", v)} />
+                <NameList label="Paternal half-brothers' names" names={namesOf("paternalBrothers")} count={census.paternalBrothers} onChange={(v) => setNames("paternalBrothers", v)} />
+                <NameList label="Paternal half-sisters' names" names={namesOf("paternalSisters")} count={census.paternalSisters} onChange={(v) => setNames("paternalSisters", v)} />
+                <NameList label="Maternal half-siblings' names" names={namesOf("maternalSiblings")} count={census.maternalSiblings} onChange={(v) => setNames("maternalSiblings", v)} />
+              </>
+            )}
           </>
         );
-      }
 
       case "agnates":
         return (
-          <YesNo
-            label="Do you have any of these living relatives: a brother's son, a paternal uncle, or a paternal uncle's son?"
-            hint="they can inherit any remainder when closer heirs are absent"
-            value={data.census.hasOtherAgnates}
-            onChange={(v) => setCensus({ hasOtherAgnates: v })}
-          />
+          <>
+            {q.agnates && (
+              <YesNo
+                label="Do you have any of these living relatives: a brother's son, a paternal uncle, or a paternal uncle's son?"
+                hint="they can inherit any remainder when closer heirs are absent"
+                value={data.census.hasOtherAgnates}
+                onChange={(v) => {
+                  setCensus({ hasOtherAgnates: v });
+                  if (!v) set({ agnateKind: "", agnateNames: "" });
+                }}
+              />
+            )}
+            {q.agnates && census.hasOtherAgnates && (
+              <>
+                <ChoiceField<AgnateKind | "">
+                  label="Which is the closest you have?"
+                  hint="choose the first in this list that applies — only the nearest inherits"
+                  value={data.agnateKind}
+                  onChange={(v) => set({ agnateKind: v })}
+                  options={AGNATE_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                />
+                <TextField
+                  label="Their full name(s)"
+                  hint="so your will can name them — separate names with commas"
+                  value={data.agnateNames}
+                  onChange={(v) => set({ agnateNames: v })}
+                />
+              </>
+            )}
+            {q.distantKindred && (
+              <YesNo
+                label="Do you have any other living blood relatives?"
+                hint="for example a daughter's children, a sister's children, aunts, or your mother's brothers"
+                value={data.census.hasDistantKindred}
+                onChange={(v) => {
+                  setCensus({ hasDistantKindred: v });
+                  if (!v) set({ distantKindredNames: "" });
+                }}
+              />
+            )}
+            {q.distantKindred && census.hasDistantKindred && (
+              <>
+                <TextField
+                  label="Who are they?"
+                  hint="names and how each is related to you"
+                  value={data.distantKindredNames}
+                  onChange={(v) => set({ distantKindredNames: v })}
+                  placeholder="e.g. Aisha Khan (my daughter's daughter)"
+                />
+                <p className="max-w-xl rounded-xl bg-gold-100/70 px-4 py-3 text-sm leading-6 text-ink/75">
+                  In the Hanafi school these relatives (dhawu al-arham) inherit
+                  when no closer heir survives. The rules for dividing the
+                  estate between them are intricate and this service does not
+                  calculate them: your will leaves that remainder to them as a
+                  scholar determines. Please ask a scholar and a solicitor to
+                  review your will before you sign it.
+                </p>
+              </>
+            )}
+          </>
         );
 
       case "executors":
@@ -637,10 +731,10 @@ export function WillWizard({
               onChange={(v) => set({ complexity: { ...data.complexity, homeOwnership: v } })}
               options={[
                 { value: "none", label: "No" },
-                { value: "sole", label: "Yes — in my name" },
-                { value: "joint", label: "Yes — jointly" },
-                { value: "tenants-in-common", label: "Yes — tenants in common" },
-                { value: "unsure", label: "Yes — not sure how" },
+                { value: "sole", label: "Yes — in my name only" },
+                { value: "joint", label: "Yes — as joint tenants" },
+                { value: "tenants-in-common", label: "Yes — as tenants in common" },
+                { value: "unsure", label: "Yes — jointly, not sure how" },
               ]}
             />
             <YesNo label="Do you own a business or business assets?" value={data.complexity.businessAssets} onChange={(v) => set({ complexity: { ...data.complexity, businessAssets: v } })} />
@@ -652,22 +746,52 @@ export function WillWizard({
 
       case "review": {
         const flags = solicitorFlags(data);
+        const outstanding = firstIncompleteStep(data, isPremium);
+        const named = (people: { name: string }[]) =>
+          people.filter((x) => x.name.trim()).map((x) => x.name.trim()).join(", ") || "—";
+        const parents =
+          [census.father && "father", census.mother && "mother"].filter(Boolean).join(" and ") || "neither";
         return (
           <>
             <div className="card">
               <h3 className="font-display text-lg font-semibold text-forest-900">Summary</h3>
               <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                 <div><dt className="text-ink/50">Name</dt><dd className="font-medium">{data.fullName || "—"}</dd></div>
-                <div><dt className="text-ink/50">Marital status</dt><dd className="font-medium capitalize">{data.maritalStatus}</dd></div>
-                <div><dt className="text-ink/50">Children</dt><dd className="font-medium">{data.census.sons} son(s), {data.census.daughters} daughter(s)</dd></div>
-                <div><dt className="text-ink/50">Executors</dt><dd className="font-medium">{data.executors.filter((e) => e.name).map((e) => e.name).join(", ") || "—"}</dd></div>
+                <div><dt className="text-ink/50">Marital status</dt><dd className="font-medium capitalize">{data.maritalStatus}{data.spouseName.trim() ? ` — ${data.spouseName.trim()}` : ""}</dd></div>
+                <div><dt className="text-ink/50">Children</dt><dd className="font-medium">{census.sons} son(s), {census.daughters} daughter(s)</dd></div>
+                <div><dt className="text-ink/50">Parents living</dt><dd className="font-medium capitalize">{parents}</dd></div>
+                <div><dt className="text-ink/50">Executors</dt><dd className="font-medium">{named(data.executors)}</dd></div>
                 {data.hasMinorChildren && (
-                  <div><dt className="text-ink/50">Guardians</dt><dd className="font-medium">{data.guardians.filter((g) => g.name).map((g) => g.name).join(", ") || "—"}</dd></div>
+                  <div><dt className="text-ink/50">Guardians</dt><dd className="font-medium">{named(data.guardians)}</dd></div>
                 )}
+                <div><dt className="text-ink/50">Islamic burial directions</dt><dd className="font-medium">{data.islamicBurial ? "Included" : "Not included"}</dd></div>
                 {isPremium && data.bequests.length > 0 && (
                   <div><dt className="text-ink/50">Bequests</dt><dd className="font-medium">{data.bequests.length} — {percentBequestTotal.toFixed(1)}% of estate</dd></div>
                 )}
               </dl>
+            </div>
+            {outstanding && (
+              <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                One thing is still needed before your will can be generated: {outstanding.message}
+              </p>
+            )}
+            <div className="card">
+              <h3 className="font-display text-lg font-semibold text-forest-900">Change an answer</h3>
+              <ul className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                {steps.slice(0, -1).map((s, i) => (
+                  <li key={s.id} className="flex items-center justify-between gap-3 border-b border-ink/5 py-1.5">
+                    <span className="text-ink/75">{s.title}</span>
+                    <button
+                      type="button"
+                      className="font-semibold text-forest-700 hover:underline"
+                      aria-label={`Edit ${s.title}`}
+                      onClick={() => goTo(i)}
+                    >
+                      Edit
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
             {flags.length > 0 && (
               <div className="rounded-2xl border border-gold-300 bg-gold-100/60 p-5">
@@ -675,7 +799,8 @@ export function WillWizard({
                   Worth a solicitor&rsquo;s eye
                 </h3>
                 <p className="mt-1 text-xs text-ink/60">
-                  Your will is still valid — these are things a will alone cannot fix.
+                  These are things a will alone cannot settle — you can still
+                  generate yours.
                 </p>
                 <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-ink/75">
                   {flags.map((f, i) => (
@@ -689,6 +814,17 @@ export function WillWizard({
       }
     }
   }
+}
+
+const FAMILY_STEPS: StepId[] = ["marriage", "children", "grandchildren", "parents", "grandparents", "siblings", "agnates"];
+
+function MuslimOnlyNote() {
+  return (
+    <p className="max-w-xl rounded-xl border border-gold-300/70 bg-gold-100/50 px-4 py-2.5 text-xs leading-5 text-ink/70">
+      Count only relatives who are Muslim — those who are not take no fixed
+      share, and can be provided for in the bequests step.
+    </p>
+  );
 }
 
 function PremiumLock({ feature }: { feature: string }) {
@@ -726,7 +862,7 @@ function BequestsEditor({
 }) {
   const update = (i: number, patch: Partial<Bequest>) =>
     onChange(bequests.map((b, j) => (j === i ? { ...b, ...patch } : b)));
-  const overCap = total > 100 / 3 + 1e-9;
+  const overCap = total > BEQUEST_CAP_PERCENT + 0.01;
   return (
     <div className="space-y-5">
       <p className="max-w-xl text-sm leading-6 text-ink/60">

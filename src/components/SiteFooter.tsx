@@ -10,8 +10,8 @@ export function SiteFooter() {
             <Logo />
             <p className="mt-4 text-sm leading-6 text-ink/60">
               A fara&rsquo;id-compliant will, drafted for England &amp; Wales,
-              from a short guided interview. Your details never leave your
-              account and are never sold.
+              from a short guided interview. Your details are used only to
+            prepare your documents and are never sold.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-10 text-sm sm:grid-cols-3">

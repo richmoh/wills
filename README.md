@@ -1,16 +1,25 @@
 # Wasiyyah — Islamic Wills for England & Wales
 
-Wasiyyah is a web application that produces a professionally drafted, fara'id-compliant
-last will and testament, valid under the law of England & Wales, from a short guided
-interview (typically 12–18 questions).
+Wasiyyah is a web application that produces a last will and testament in the Qur'anic
+(fara'id) shares, drafted for the law of England & Wales, from a short guided interview
+(typically 12–18 questions).
 
 **Live:** https://wills.themuslimguide.org
 
 ## Status
 
 - ✅ Live in production (VPS, PM2 + nginx + Let's Encrypt)
-- ✅ Engine test suite green (24 tests incl. 2,000-case invariant fuzz)
-- ✅ Browser end-to-end suite green against production
+- ✅ Unit suite green: 60 tests — engine golden cases and invariants, plus the interview's
+  pruning rules checked against the engine for 20,000 random families
+- ✅ Browser end-to-end suite green locally (50 checks: interview, shares, document, paid
+  pack, mirror will, password reset, data export, account deletion)
+- ⚠️ **Changes since the last deploy need three things on the server before deploying:**
+  `migrations/002_account_security.sql` applied (the deploy script now applies all
+  migrations, untested against the server), `NEXT_PUBLIC_APP_URL` set, and — for password
+  reset emails — `RESEND_API_KEY` + `EMAIL_FROM`. Without the email keys the forgot-password
+  page tells people to email support.
+- ⏳ Not yet reviewed by a solicitor (will wording, terms) or a scholar (fiqh). The site
+  now says so; the open questions for each are listed in "Open questions for review" below.
 - ⏳ **Stripe keys not yet configured on the server** — checkout returns a friendly
   503 until `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` are added to
   `/var/www/wasiyyah/.env.local` and the app restarted (`pm2 restart wasiyyah`).
@@ -90,13 +99,16 @@ DOMAINS.md          domain-name availability research
 pnpm install
 createdb wasiyyah_dev
 psql wasiyyah_dev -f migrations/001_init.sql
+psql wasiyyah_dev -f migrations/002_account_security.sql   # consent + password resets
 cp .env.example .env.local   # then fill in values
 pnpm dev                     # http://localhost:3000
-pnpm test                    # engine test suite (vitest)
+pnpm test                    # unit suite: engine + interview (vitest)
 
-# end-to-end (uses your installed Chrome):
-pnpm build && PORT=3100 pnpm start &
-node tests/e2e.mjs           # screenshots land in tests/shots/
+# end-to-end (uses your installed Chrome). It needs the development server — it relies on
+# the simulated upgrade and the dev-only reset link — and refuses to run against anything
+# but localhost, because it creates and deletes an account:
+pnpm dev -p 3100 &
+pnpm test:e2e                # screenshots land in tests/shots/
 ```
 
 ## Environment
@@ -110,6 +122,8 @@ node tests/e2e.mjs           # screenshots land in tests/shots/
 | `STRIPE_PRICE_ID` | optional pre-created Price (ad-hoc GBP price used if unset) |
 | `PREMIUM_PRICE_PENCE` | pack price in pence (default 3900) |
 | `NEXT_PUBLIC_APP_URL` | canonical URL, e.g. `https://wills.themuslimguide.org` |
+| `RESEND_API_KEY` | Resend API key for password-reset emails (optional in dev — the email is printed to the server console) |
+| `EMAIL_FROM` | sender address on a domain verified in Resend, e.g. `Wasiyyah <no-reply@example.org>` |
 
 ## Deployment
 
@@ -123,6 +137,27 @@ Redeploy after changes:
 ```bash
 ./deploy/deploy.sh   # rsync → pnpm install → build → pm2 restart
 ```
+
+## Open questions for review
+
+For the solicitor:
+
+- The residuary gift relies on a scholar's written determination if the family changes.
+- Section 33 of the Wills Act 1837 (a predeceased child's issue take their gift) is not
+  expressly excluded, and can conflict with the Islamic shares.
+- Religious debts (zakat, fidya, kaffarah, Hajj) are not legal debts; the clause is in
+  effect a gift of uncertain amount.
+- Remoter relatives: the will names the class and any names given, but the nearest
+  male-line relative and distant kindred are ultimately identified at death.
+- The terms of service, in particular the liability clause.
+
+For the scholar:
+
+- Religious debts are paid before bequests and shares (the Shafi'i position); the Hanafi
+  position takes them from the bequeathable third, and only if bequeathed.
+- Distant kindred (dhawu al-arham) take the remainder when no sharer other than a spouse
+  and no residuary heir survives, but the engine does not divide it between them.
+- Relatives who are not Muslim are left out of the count on the user's own answers.
 
 ## Legal posture
 

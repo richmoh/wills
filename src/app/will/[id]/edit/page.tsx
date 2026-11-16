@@ -1,8 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { queryOne } from "@/lib/db";
-import { emptyCensus } from "@/lib/faraid/types";
-import { emptyWillData, type WillData } from "@/lib/will-types";
+import { isUuid, normalizeWillData } from "@/lib/will-types";
 import { SiteHeader } from "@/components/SiteHeader";
 import { WillWizard } from "@/components/wizard/WillWizard";
 
@@ -17,21 +16,15 @@ export default async function EditWillPage({
   if (!user) redirect("/login");
 
   const { id } = await params;
-  const will = await queryOne<{ id: string; data: Partial<WillData> }>(
+  if (!isUuid(id)) notFound();
+  const will = await queryOne<{ id: string; data: unknown }>(
     `select id, data from wills where id = $1 and user_id = $2`,
     [id, user.id]
   );
   if (!will) notFound();
 
-  // merge stored data over fresh defaults so older drafts survive schema growth
-  const defaults = emptyWillData();
-  const data: WillData = {
-    ...defaults,
-    ...will.data,
-    census: { ...emptyCensus(), ...(will.data.census ?? {}) },
-    religiousDebts: { ...defaults.religiousDebts, ...(will.data.religiousDebts ?? {}) },
-    complexity: { ...defaults.complexity, ...(will.data.complexity ?? {}) },
-  };
+  // stored answers are normalised so older drafts survive schema growth
+  const data = normalizeWillData(will.data);
 
   return (
     <>
